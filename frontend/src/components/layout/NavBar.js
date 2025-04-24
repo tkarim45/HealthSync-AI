@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { NavLink } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { useAuth } from "../../context/AuthContext"; // Adjust path if needed
+import { useAuth } from "../../context/AuthContext";
 import { FaHome, FaInfoCircle, FaBlog, FaSignInAlt, FaSignOutAlt, FaDollarSign, FaHeartbeat, FaUser } from "react-icons/fa";
 
 const NavBar = () => {
@@ -20,6 +20,9 @@ const NavBar = () => {
     visible: { opacity: 1, scale: 1, transition: { duration: 0.2 } },
     exit: { opacity: 0, scale: 0.95, transition: { duration: 0.15 } },
   };
+
+  // Determine dashboard path based on user role
+  const dashboardPath = user ? `/dashboard/${user.role}` : "/dashboard/user";
 
   return (
     <nav className="bg-gradient-to-r from-secondary to-bgLight p-4 shadow-soft sticky top-0 z-50">
@@ -75,7 +78,7 @@ const NavBar = () => {
           </li>
           {user && (
             <li>
-              <NavLink to="/dashboard" className={({ isActive }) => `${isActive ? "text-accent" : "text-text"} hover:text-accent transition-colors duration-300 flex items-center space-x-2`}>
+              <NavLink to={dashboardPath} className={({ isActive }) => `${isActive ? "text-accent" : "text-text"} hover:text-accent transition-colors duration-300 flex items-center space-x-2`}>
                 <FaUser />
                 <motion.span whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
                   Dashboard
@@ -86,7 +89,7 @@ const NavBar = () => {
           {user ? (
             <li className="relative">
               <motion.button className="text-text hover:text-accent transition-colors duration-300 flex items-center space-x-2" onClick={() => setIsDropdownOpen(!isDropdownOpen)} whileHover={{ scale: 1.1 }}>
-                <FaBlog />
+                <FaUser />
                 <span>Account</span>
                 <motion.svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" animate={{ rotate: isDropdownOpen ? 180 : 0 }} transition={{ duration: 0.3 }}>
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
@@ -156,7 +159,7 @@ const NavBar = () => {
               </li>
               {user && (
                 <li>
-                  <NavLink to="/dashboard" className={({ isActive }) => `${isActive ? "text-accent" : "text-text"} hover:text-accent transition-colors duration-300 flex items-center space-x-2`} onClick={() => setIsMobileMenuOpen(false)}>
+                  <NavLink to={dashboardPath} className={({ isActive }) => `${isActive ? "text-accent" : "text-text"} hover:text-accent transition-colors duration-300 flex items-center space-x-2`} onClick={() => setIsMobileMenuOpen(false)}>
                     <FaUser />
                     <span>Dashboard</span>
                   </NavLink>

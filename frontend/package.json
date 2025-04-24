@@ -29,10 +29,7 @@
     "extends": "react-app",
     "rules": {
       "no-unused-vars": "warn"
-    },
-    "ignoreWarnings": [
-      "source-map"
-    ]
+    }
   },
   "browserslist": {
     "production": [

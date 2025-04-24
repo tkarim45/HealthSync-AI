@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 const AuthContext = createContext();
 
@@ -8,11 +8,42 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem("token") || null);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
-    localStorage.setItem("user", JSON.stringify(user));
-    localStorage.setItem("token", token);
-  }, [user, token]);
+    // Update localStorage only if user or token changes
+    if (user) {
+      localStorage.setItem("user", JSON.stringify(user));
+    } else {
+      localStorage.removeItem("user");
+    }
+    if (token) {
+      localStorage.setItem("token", token);
+    } else {
+      localStorage.removeItem("token");
+    }
+
+    // Redirect only on initial login or role change
+    if (user && token && location.pathname === "/login") {
+      console.log("Redirecting after login, role:", user.role);
+      switch (user.role) {
+        case "super_admin":
+          navigate("/dashboard/super-admin");
+          break;
+        case "admin":
+          navigate("/dashboard/admin");
+          break;
+        case "doctor":
+          navigate("/dashboard/doctor");
+          break;
+        case "user":
+          navigate("/dashboard/user");
+          break;
+        default:
+          navigate("/dashboard/user");
+      }
+    }
+  }, [user, token, navigate, location.pathname]);
 
   const login = async ({ username, password }) => {
     setLoading(true);
@@ -28,6 +59,7 @@ export const AuthProvider = ({ children }) => {
       console.log("Login raw response:", text);
       const data = JSON.parse(text);
       if (!response.ok) throw new Error(data.detail || "Login failed");
+      console.log("Login data:", data);
       setUser(data.user);
       setToken(data.token);
     } catch (err) {
