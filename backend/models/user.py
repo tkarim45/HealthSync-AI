@@ -1,33 +1,29 @@
-from pydantic import BaseModel, EmailStr
-from typing import Optional
+from pydantic import BaseModel
 from datetime import datetime
+from typing import Optional
 
 
-class User(BaseModel):
+class UserCreate(BaseModel):
     username: str
-    email: EmailStr
+    email: str
     password: str
-    created_at: Optional[datetime] = datetime.utcnow()
+    role: Optional[str] = "user"  # Default to regular user
 
 
 class UserInDB(BaseModel):
     id: str
     username: str
-    email: EmailStr
+    email: str
     hashed_password: str
+    role: str
     created_at: datetime
-
-
-class UserCreate(BaseModel):
-    username: str
-    email: EmailStr
-    password: str
 
 
 class UserResponse(BaseModel):
     id: str
     username: str
-    email: EmailStr
+    email: str
+    role: str
 
 
 class Token(BaseModel):
@@ -38,3 +34,22 @@ class Token(BaseModel):
 class LoginRequest(BaseModel):
     username: str
     password: str
+
+
+class HospitalCreate(BaseModel):
+    name: str
+    address: str
+    lat: float
+    lng: float
+
+
+class HospitalResponse(BaseModel):
+    id: str
+    name: str
+    address: str
+    lat: float
+    lng: float
+
+
+class HospitalAdminAssign(BaseModel):
+    user_id: str
