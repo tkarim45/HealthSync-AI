@@ -3,47 +3,37 @@ import json
 import logging
 import re
 import base64
-from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Form, Request
+from fastapi import (
+    FastAPI,
+    HTTPException,
+    Depends,
+    UploadFile,
+    File,
+    Form,
+    Request,
+    BackgroundTasks,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
 import sqlite3
-from dotenv import load_dotenv
-from jose import jwt
-from jose.exceptions import JWTError
-from models.user import (
-    UserCreate,
-    UserInDB,
-    UserResponse,
-    Token,
-    LoginRequest,
-    HospitalCreate,
-    HospitalResponse,
-    HospitalAdminAssign,
-)
-from passlib.context import CryptContext
+from models.schemas import *
 import uuid
 from datetime import datetime, timedelta, date
-from pydantic import BaseModel
 from typing import Optional, List
 import requests
-from utils.parser import (
-    parse_blood_report,
-    structure_report,
-    get_chat_history,
-    store_chat_history,
-    analyze_acne_image,
-)
+from config.settings import settings
+from utils.db import init_db
+from utils.parser import *
+from routes.auth import *
+from routes import auth
+from utils.pineconeutils import *
+from utils.email import *
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-load_dotenv()
-DB_PATH = "/Users/taimourabdulkarim/Documents/Personal Github Repositories/HealthSync-AI/backend/healthsync.db"
-JWT_SECRET = os.getenv("JWT_SECRET", "your-secret-key")
-JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
-ACCESS_TOKEN_EXPIRE_MINUTES = 60
-PUBLIC_API_URL = "https://1e13-35-233-239-24.ngrok-free.app/generate"
+init_db()
 
 app = FastAPI()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
@@ -56,269 +46,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-
-# Pydantic models
-class ChatbotRequest(BaseModel):
-    query: str
-
-
-def init_db():
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    # Users table
-    c.execute(
-        """
-        CREATE TABLE IF NOT EXISTS users (
-            id TEXT PRIMARY KEY,
-            username TEXT UNIQUE,
-            email TEXT UNIQUE,
-            password TEXT,
-            role TEXT DEFAULT 'user',
-            created_at TEXT
-        )
-    """
-    )
-    # Add role column if it doesn't exist
-    c.execute("PRAGMA table_info(users)")
-    columns = [col[1] for col in c.fetchall()]
-    if "role" not in columns:
-        c.execute("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'")
-    # Hospitals table
-    c.execute(
-        """
-        CREATE TABLE IF NOT EXISTS hospitals (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            address TEXT NOT NULL,
-            lat REAL NOT NULL,
-            lng REAL NOT NULL,
-            created_at TEXT
-        )
-    """
-    )
-    # Hospital admins table
-    c.execute(
-        """
-        CREATE TABLE IF NOT EXISTS hospital_admins (
-            hospital_id TEXT,
-            user_id TEXT,
-            assigned_at TEXT,
-            PRIMARY KEY (hospital_id, user_id),
-            FOREIGN KEY (hospital_id) REFERENCES hospitals(id) ON DELETE CASCADE,
-            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-        )
-    """
-    )
-    # Departments table
-    c.execute(
-        """
-        CREATE TABLE IF NOT EXISTS departments (
-            id TEXT PRIMARY KEY,
-            hospital_id TEXT NOT NULL,
-            name TEXT NOT NULL,
-            FOREIGN KEY (hospital_id) REFERENCES hospitals(id) ON DELETE CASCADE
-        )
-    """
-    )
-    # Doctors table
-    c.execute(
-        """
-        CREATE TABLE IF NOT EXISTS doctors (
-            user_id TEXT NOT NULL,
-            department_id TEXT NOT NULL,
-            specialty TEXT NOT NULL,
-            title TEXT NOT NULL,
-            phone TEXT,
-            bio TEXT,
-            PRIMARY KEY (user_id, department_id),
-            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-            FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE CASCADE
-        )
-    """
-    )
-    # Doctor availability table
-    c.execute(
-        """
-        CREATE TABLE IF NOT EXISTS doctor_availability (
-            id TEXT PRIMARY KEY,
-            user_id TEXT NOT NULL,
-            day_of_week TEXT NOT NULL,  -- e.g., 'Monday', 'Tuesday'
-            start_time TEXT NOT NULL,   -- e.g., '09:00'
-            end_time TEXT NOT NULL,     -- e.g., '09:30'
-            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-        )
-    """
-    )
-    # Appointments table
-    c.execute(
-        """
-        CREATE TABLE IF NOT EXISTS appointments (
-            id TEXT PRIMARY KEY,
-            user_id TEXT NOT NULL,      -- Patient
-            doctor_id TEXT NOT NULL,    -- Doctor
-            department_id TEXT NOT NULL,
-            appointment_date TEXT NOT NULL,  -- e.g., '2025-04-25'
-            start_time TEXT NOT NULL,   -- e.g., '09:00'
-            end_time TEXT NOT NULL,     -- e.g., '09:30'
-            status TEXT NOT NULL,       -- e.g., 'scheduled', 'completed', 'cancelled'
-            created_at TEXT,
-            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-            FOREIGN KEY (doctor_id) REFERENCES users(id) ON DELETE CASCADE,
-            FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE CASCADE,
-            UNIQUE (doctor_id, appointment_date, start_time)
-        )
-    """
-    )
-    # Medical history table
-    c.execute(
-        """
-    CREATE TABLE IF NOT EXISTS medical_history (
-        id TEXT PRIMARY KEY,
-        user_id TEXT NOT NULL,
-        conditions TEXT,
-        allergies TEXT,
-        notes TEXT,
-        updated_at TEXT,
-        updated_by TEXT,
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-        FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
-    )
-    """
-    )
-    conn.commit()
-    conn.close()
-
-
-# Call init_db at startup
-init_db()
-
-
-async def get_current_user(token: str = Depends(oauth2_scheme)):
-    try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        user_id = payload.get("sub")
-        role = payload.get("role")
-        if user_id is None or role is None:
-            raise HTTPException(status_code=401, detail="Invalid token")
-        logger.info(f"Authenticated user: {user_id}, role: {role}")
-        return {"user_id": user_id, "role": role}
-    except JWTError as e:
-        logger.error(f"JWT error: {str(e)}")
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-
-def require_role(role: str):
-    async def role_checker(current_user: dict = Depends(get_current_user)):
-        if current_user["role"] != role:
-            raise HTTPException(status_code=403, detail=f"Requires {role} role")
-        return current_user
-
-    return role_checker
-
-
-def create_access_token(data: dict, expires_delta: timedelta = None):
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=15)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
-    return encoded_jwt
-
-
-async def get_user(username: str):
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute(
-        "SELECT id, username, email, password, role, created_at FROM users WHERE username = ?",
-        (username,),
-    )
-    user = c.fetchone()
-    conn.close()
-    if user:
-        return UserInDB(
-            id=user[0],
-            username=user[1],
-            email=user[2],
-            hashed_password=user[3],
-            role=user[4],
-            created_at=datetime.fromisoformat(user[5]),
-        )
-    return None
-
-
-@app.post("/api/auth/signup", response_model=Token)
-async def signup(user: UserCreate):
-    logger.info(
-        f"Attempting signup for username: {user.username}, email: {user.email}, role: {user.role}"
-    )
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute(
-        "SELECT username, email FROM users WHERE username = ? OR email = ?",
-        (user.username, user.email),
-    )
-    if c.fetchone():
-        conn.close()
-        raise HTTPException(status_code=400, detail="Username or email already exists")
-    hashed_password = pwd_context.hash(user.password)
-    user_id = str(uuid.uuid4())
-    created_at = datetime.utcnow().isoformat()
-    # Restrict signup to 'user' role; other roles set manually via DB
-    role = "user"
-    logger.info(f"Assigning role: {role} to user: {user.username}")
-    c.execute(
-        "INSERT INTO users (id, username, email, password, role, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-        (user_id, user.username, user.email, hashed_password, role, created_at),
-    )
-    conn.commit()
-    conn.close()
-    access_token = create_access_token(
-        data={"sub": user_id, "role": role},
-        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
-    )
-    logger.info(f"User signed up: {user.username}, role: {role}")
-    return {
-        "token": access_token,
-        "user": UserResponse(
-            id=user_id, username=user.username, email=user.email, role=role
-        ),
-    }
-
-
-@app.post("/api/auth/login", response_model=Token)
-async def login(login_data: LoginRequest):
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    user = await get_user(login_data.username)
-    if not user:
-        conn.close()
-        raise HTTPException(status_code=400, detail="Incorrect username or password")
-    if not pwd_context.verify(login_data.password, user.hashed_password):
-        conn.close()
-        raise HTTPException(status_code=400, detail="Incorrect username or password")
-    access_token = create_access_token(
-        data={"sub": user.id, "role": user.role},
-        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
-    )
-    logger.info(f"User logged in: {user.username}, role: {user.role}")
-    response = {
-        "token": access_token,
-        "user": UserResponse(
-            id=user.id, username=user.username, email=user.email, role=user.role
-        ),
-    }
-    conn.close()
-    logger.debug(f"Login response: {response}")
-    return response
-
-
-class HospitalAdminCreate(BaseModel):
-    hospital_id: str
-    username: str
+app.include_router(auth.router)
 
 
 @app.post("/api/hospitals", response_model=HospitalResponse)
@@ -327,7 +55,7 @@ async def create_hospital(
 ):
     if current_user["role"] != "super_admin":
         raise HTTPException(status_code=403, detail="Not authorized")
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(settings.DB_PATH)
     c = conn.cursor()
     hospital_id = str(uuid.uuid4())
     c.execute(
@@ -353,7 +81,7 @@ async def assign_hospital_admin(
     if current_user["role"] != "super_admin":
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(settings.DB_PATH)
     c = conn.cursor()
 
     # Check if any admins exist
@@ -404,7 +132,7 @@ async def get_admins(current_user: dict = Depends(get_current_user)):
     if current_user["role"] != "super_admin":
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(settings.DB_PATH)
     c = conn.cursor()
     c.execute("SELECT id, username, email, role FROM users WHERE role = 'admin'")
     admins = [
@@ -419,7 +147,7 @@ async def get_admins(current_user: dict = Depends(get_current_user)):
 
 @app.get("/api/hospitals", response_model=list[HospitalResponse])
 async def list_hospitals(current_user: dict = Depends(get_current_user)):
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(settings.DB_PATH)
     c = conn.cursor()
     c.execute("SELECT id, name, address, lat, lng FROM hospitals")
     hospitals = [
@@ -439,7 +167,7 @@ async def update_hospital(
     hospital: HospitalCreate,
     current_user: dict = Depends(require_role("super_admin")),
 ):
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(settings.DB_PATH)
     c = conn.cursor()
     c.execute("SELECT id FROM hospitals WHERE id = ?", (hospital_id,))
     if not c.fetchone():
@@ -472,7 +200,7 @@ async def update_hospital(
 async def delete_hospital(
     hospital_id: str, current_user: dict = Depends(require_role("super_admin"))
 ):
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(settings.DB_PATH)
     c = conn.cursor()
     c.execute("SELECT id FROM hospitals WHERE id = ?", (hospital_id,))
     if not c.fetchone():
@@ -493,7 +221,7 @@ async def assign_hospital_admin(
     assignment: HospitalAdminAssign,
     current_user: dict = Depends(require_role("super_admin")),
 ):
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(settings.DB_PATH)
     c = conn.cursor()
     # Verify hospital exists
     c.execute("SELECT id FROM hospitals WHERE id = ?", (hospital_id,))
@@ -752,100 +480,6 @@ async def acne_analysis(
 ##########################################################################################
 
 
-class DepartmentCreate(BaseModel):
-    name: str
-
-
-class DepartmentResponse(BaseModel):
-    id: str
-    hospital_id: str
-    name: str
-    hospital_name: Optional[str]
-
-
-class DoctorCreate(BaseModel):
-    department_id: str
-    username: str
-    specialty: str
-    title: str
-    phone: Optional[str] = None
-    bio: Optional[str] = None
-
-
-class DoctorResponse(BaseModel):
-    user_id: str
-    username: str
-    email: str
-    department_id: str
-    department_name: str
-    specialty: str
-    title: str
-    phone: Optional[str]
-    bio: Optional[str]
-
-
-class AvailabilityCreate(BaseModel):
-    user_id: str
-    day_of_week: str
-    start_time: str
-    end_time: str
-
-
-class AvailabilityResponse(BaseModel):
-    id: str
-    user_id: str
-    day_of_week: str
-    start_time: str
-    end_time: str
-
-
-class AppointmentCreate(BaseModel):
-    doctor_id: str
-    department_id: str
-    hospital_id: str
-    appointment_date: str
-    start_time: str
-    end_time: str
-
-
-class AppointmentResponse(BaseModel):
-    id: str
-    user_id: str
-    username: Optional[str] = None
-    email: Optional[str] = None
-    doctor_id: str
-    doctor_username: str
-    department_id: str
-    department_name: str
-    appointment_date: str
-    start_time: str
-    end_time: str
-    status: str
-    created_at: str
-    hospital_id: Optional[str] = None
-
-
-class DoctorCreate(BaseModel):
-    department_id: str
-    username: str
-    email: str
-    password: str
-    specialty: str
-    title: str
-    phone: Optional[str] = None
-    bio: Optional[str] = None
-
-
-class MedicalHistoryResponse(BaseModel):
-    id: str
-    user_id: str
-    conditions: Optional[str]
-    allergies: Optional[str]
-    notes: Optional[str]
-    updated_at: Optional[str]
-    updated_by: Optional[str]
-
-
 @app.get("/api/admin/hospital", response_model=HospitalResponse)
 async def get_admin_hospital(current_user: dict = Depends(get_current_user)):
     if current_user["role"] != "admin":
@@ -853,7 +487,7 @@ async def get_admin_hospital(current_user: dict = Depends(get_current_user)):
 
     logger.info(f"Current user: {current_user}")
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(settings.DB_PATH)
     c = conn.cursor()
     c.execute(
         "SELECT h.id, h.name, h.address, h.lat, h.lng FROM hospitals h JOIN hospital_admins ha ON h.id = ha.hospital_id WHERE ha.user_id = ?",
@@ -881,7 +515,7 @@ async def create_department(
     if current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(settings.DB_PATH)
     c = conn.cursor()
 
     c.execute(
@@ -920,7 +554,7 @@ async def assign_doctor(
         f"Assigning doctor: username={doctor.username}, department_id={doctor.department_id}, email={doctor.email}"
     )
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(settings.DB_PATH)
     c = conn.cursor()
 
     # Get admin's hospital
@@ -1063,7 +697,7 @@ async def assign_doctor(
 async def get_departments(
     hospital_id: Optional[str] = None, current_user: dict = Depends(get_current_user)
 ):
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(settings.DB_PATH)
     c = conn.cursor()
     query = """
         SELECT d.id, d.hospital_id, d.name, h.name
@@ -1093,7 +727,7 @@ async def get_departments(
 async def get_doctors(
     department_id: Optional[str] = None, current_user: dict = Depends(get_current_user)
 ):
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(settings.DB_PATH)
     c = conn.cursor()
     query = """
         SELECT doc.user_id, u.username, u.email, doc.department_id, d.name,
@@ -1134,7 +768,7 @@ async def get_doctors(
 async def get_doctor_availability(
     doctor_id: str, current_user: dict = Depends(get_current_user)
 ):
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(settings.DB_PATH)
     c = conn.cursor()
     c.execute(
         """
@@ -1162,12 +796,14 @@ async def get_doctor_availability(
 
 @app.post("/api/appointments", response_model=AppointmentResponse)
 async def book_appointment(
-    appointment: AppointmentCreate, current_user: dict = Depends(get_current_user)
+    appointment: AppointmentCreate,
+    current_user: dict = Depends(get_current_user),
+    background_tasks: BackgroundTasks = BackgroundTasks(),
 ):
     if current_user["role"] not in ["user", "admin"]:
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(settings.DB_PATH)
     c = conn.cursor()
 
     # Verify doctor exists and get username
@@ -1235,16 +871,16 @@ async def book_appointment(
         conn.close()
         raise HTTPException(status_code=400, detail="Slot already booked")
 
-    # Fetch patient's username
+    # Fetch patient's username and email
     c.execute(
-        "SELECT username FROM users WHERE id = ?",
+        "SELECT username, email FROM users WHERE id = ?",
         (current_user["user_id"],),
     )
     user = c.fetchone()
     if not user:
         conn.close()
         raise HTTPException(status_code=404, detail="User not found")
-    patient_username = user[0]
+    patient_username, patient_email = user
 
     # Insert appointment
     appointment_id = str(uuid.uuid4())
@@ -1273,14 +909,26 @@ async def book_appointment(
     conn.commit()
     conn.close()
 
+    # Send confirmation email in the background
+    if patient_email:
+        background_tasks.add_task(
+            send_confirmation_email,
+            recipient_email=patient_email,
+            patient_username=patient_username,
+            doctor_username=doctor_username,
+            department_name=department_name,
+            appointment_date=appointment.appointment_date,
+            start_time=appointment.start_time,
+            hospital_id=appointment.hospital_id,
+        )
+
     logger.info(
         f"Booked appointment for user {current_user['user_id']} with doctor {appointment.doctor_id}"
     )
     return AppointmentResponse(
         id=appointment_id,
         user_id=current_user["user_id"],
-        username=patient_username,  # Use fetched username
-        email=None,  # Still not needed by frontend
+        username=patient_username,
         doctor_id=appointment.doctor_id,
         doctor_username=doctor_username,
         department_id=appointment.department_id,
@@ -1292,11 +940,6 @@ async def book_appointment(
         created_at=created_at,
         hospital_id=appointment.hospital_id,
     )
-
-
-class TimeSlotResponse(BaseModel):
-    start_time: str
-    end_time: str
 
 
 @app.get("/api/doctor/{doctor_id}/slots", response_model=List[TimeSlotResponse])
@@ -1315,7 +958,7 @@ async def get_doctor_slots(
             status_code=400, detail="Invalid date format. Use YYYY-MM-DD"
         )
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(settings.DB_PATH)
     c = conn.cursor()
 
     # Verify doctor exists
@@ -1355,7 +998,7 @@ async def get_doctor_slots(
 
 @app.get("/api/appointments", response_model=List[AppointmentResponse])
 async def get_appointments(current_user: dict = Depends(get_current_user)):
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(settings.DB_PATH)
     c = conn.cursor()
     if current_user["role"] == "admin":
         c.execute(
@@ -1412,7 +1055,7 @@ async def get_doctor_department(current_user: dict = Depends(get_current_user)):
     if current_user["role"] != "doctor":
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(settings.DB_PATH)
     c = conn.cursor()
     c.execute(
         """
@@ -1445,7 +1088,7 @@ async def get_todays_appointments(current_user: dict = Depends(get_current_user)
         raise HTTPException(status_code=403, detail="Not authorized")
 
     today = date.today().isoformat()
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(settings.DB_PATH)
     c = conn.cursor()
     c.execute(
         """
@@ -1498,7 +1141,7 @@ async def get_weekly_appointments(current_user: dict = Depends(get_current_user)
     start_date = start_of_week.isoformat()
     end_date = end_of_week.isoformat()
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(settings.settings.DB_PATH)
     c = conn.cursor()
     c.execute(
         """
@@ -1553,7 +1196,7 @@ async def get_patient_medical_history(
         raise HTTPException(status_code=403, detail="Not authorized")
 
     # Verify doctor has an appointment with this patient
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(settings.DB_PATH)
     c = conn.cursor()
     c.execute(
         """
@@ -1605,37 +1248,13 @@ async def get_patient_medical_history(
 ##########################################################################################
 
 
-# Models (only new/updated models shown)
-class AdminResponse(BaseModel):
-    id: str
-    username: str
-    email: str
-    role: str
-    hospital_name: Optional[str]
-
-
-class AppointmentResponse(BaseModel):
-    id: str
-    user_id: str
-    username: str
-    doctor_id: str
-    doctor_username: str
-    department_id: str
-    department_name: str
-    appointment_date: str
-    start_time: str
-    end_time: str
-    status: str
-    created_at: str
-
-
 # Updated endpoint: GET /api/admins
 @app.get("/api/admins", response_model=List[AdminResponse])
 async def get_admins(current_user: dict = Depends(get_current_user)):
     if current_user["role"] != "superadmin":
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(settings.DB_PATH)
     c = conn.cursor()
     c.execute(
         """
@@ -1664,7 +1283,7 @@ async def get_all_appointments(current_user: dict = Depends(get_current_user)):
     if current_user["role"] != "superadmin":
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(settings.DB_PATH)
     c = conn.cursor()
     c.execute(
         """
@@ -1701,13 +1320,6 @@ async def get_all_appointments(current_user: dict = Depends(get_current_user)):
     return appointments
 
 
-class AdminCreate(BaseModel):
-    username: str
-    email: str
-    password: str
-    hospital_id: Optional[str]
-
-
 @app.post("/api/admins")
 async def create_admin(
     admin: AdminCreate, current_user: dict = Depends(get_current_user)
@@ -1715,7 +1327,7 @@ async def create_admin(
     if current_user["role"] != "super_admin":
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(settings.DB_PATH)
     c = conn.cursor()
 
     # Check if username or email already exists
@@ -1782,6 +1394,150 @@ async def create_admin(
 
 
 from datetime import date, timedelta
+
+
+@app.delete("/api/admins/{admin_id}")
+async def delete_admin(
+    admin_id: str, current_user: dict = Depends(require_role("super_admin"))
+):
+    conn = sqlite3.connect(settings.DB_PATH)
+    c = conn.cursor()
+
+    # Verify user exists and is an admin
+    c.execute("SELECT role FROM users WHERE id = ?", (admin_id,))
+    user = c.fetchone()
+    if not user:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Admin not found")
+    if user[0] != "admin":
+        conn.close()
+        raise HTTPException(status_code=400, detail="User is not an admin")
+
+    try:
+        # Delete from hospital_admins
+        c.execute("DELETE FROM hospital_admins WHERE user_id = ?", (admin_id,))
+        # Delete from users
+        c.execute("DELETE FROM users WHERE id = ?", (admin_id,))
+        conn.commit()
+        logger.info(
+            f"Admin {admin_id} deleted by super_admin {current_user['user_id']}"
+        )
+        return {"detail": "Admin deleted"}
+    except sqlite3.Error as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    finally:
+        conn.close()
+
+
+@app.delete("/api/doctors/{doctor_id}")
+async def delete_doctor(
+    doctor_id: str, current_user: dict = Depends(require_role("admin"))
+):
+    conn = sqlite3.connect(settings.DB_PATH)
+    c = conn.cursor()
+
+    # Get admin's hospital
+    c.execute(
+        "SELECT hospital_id FROM hospital_admins WHERE user_id = ?",
+        (current_user["user_id"],),
+    )
+    hospital_id = c.fetchone()
+    if not hospital_id:
+        conn.close()
+        raise HTTPException(status_code=404, detail="No hospital assigned")
+    hospital_id = hospital_id[0]
+
+    # Verify doctor exists and is in the admin's hospital
+    c.execute(
+        """
+        SELECT doc.user_id
+        FROM doctors doc
+        JOIN departments d ON doc.department_id = d.id
+        WHERE doc.user_id = ? AND d.hospital_id = ?
+        """,
+        (doctor_id, hospital_id),
+    )
+    if not c.fetchone():
+        conn.close()
+        raise HTTPException(
+            status_code=404, detail="Doctor not found or not in your hospital"
+        )
+
+    # Check for scheduled appointments
+    c.execute(
+        """
+        SELECT COUNT(*) FROM appointments
+        WHERE doctor_id = ? AND status = 'scheduled'
+        """,
+        (doctor_id,),
+    )
+    scheduled_appointments = c.fetchone()[0]
+    if scheduled_appointments > 0:
+        # Cancel all scheduled appointments
+        c.execute(
+            """
+            UPDATE appointments
+            SET status = 'cancelled'
+            WHERE doctor_id = ? AND status = 'scheduled'
+            """,
+            (doctor_id,),
+        )
+
+    try:
+        # Delete from doctor_availability
+        c.execute("DELETE FROM doctor_availability WHERE user_id = ?", (doctor_id,))
+        # Delete from doctors
+        c.execute("DELETE FROM doctors WHERE user_id = ?", (doctor_id,))
+        # Delete from users
+        c.execute("DELETE FROM users WHERE id = ?", (doctor_id,))
+        conn.commit()
+        logger.info(f"Doctor {doctor_id} deleted by admin {current_user['user_id']}")
+        return {"detail": "Doctor deleted"}
+    except sqlite3.Error as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    finally:
+        conn.close()
+
+
+@app.post("/api/general-query")
+async def general_query(
+    request: GeneralQueryRequest, current_user: dict = Depends(get_current_user)
+):
+    """Process general medical queries using the RAG system."""
+    try:
+        query = request.query
+        if not query.strip():
+            logger.error("Empty query provided")
+            raise HTTPException(
+                status_code=400, detail="A non-empty query is required."
+            )
+
+        logger.info(
+            f"Processing general query for user {current_user['user_id']}: {query}"
+        )
+
+        # Get recent chat history for context
+        history = get_general_chat_history(current_user["user_id"])
+        history_text = ""
+        for entry in history:
+            history_text += (
+                f"User: {entry['query']}\nAssistant: {entry['response']}\n\n"
+            )
+
+        # Process query with RAG system
+        response = retrieval_chain.invoke({"input": query, "history": history_text})
+        answer = response.get("answer", "No answer found.")
+
+        # Store chat history
+        store_general_chat_history(current_user["user_id"], query, answer)
+
+        logger.info(f"Query processed successfully: {answer[:100]}...")
+        return {"response": answer}
+    except Exception as e:
+        logger.error(f"Error processing general query: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 if __name__ == "__main__":
