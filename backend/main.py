@@ -390,7 +390,7 @@ Blood Test Results (JSON):
 
         logger.info(f"Sending prompt to public API: {prompt[:100]}...")
         api_response = requests.post(
-            PUBLIC_API_URL, json={"prompt": prompt, "max_new_tokens": 300}
+            settings.PUBLIC_API_URL, json={"prompt": prompt, "max_new_tokens": 300}
         )
         api_response.raise_for_status()
         response_data = api_response.json()
