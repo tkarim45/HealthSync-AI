@@ -39,9 +39,9 @@ const DashboardPage = () => {
     { name: "Medical History", icon: <FaHistory className="text-3xl" />, section: "medical-history", description: "View your health records" },
     { name: "Book Appointment", icon: <FaCalendar className="text-3xl" />, path: "/book-appointment", description: "Schedule with AI" },
     { name: "Disease Detection", icon: <FaCamera className="text-3xl" />, path: "/disease-detection", description: "Analyze images" },
-    { name: "Medical Query", icon: <FaQuestionCircle className="text-3xl" />, path: "/medical-query", description: "Ask health questions" },
+    { name: "Analyze Blood Reports", icon: <FaQuestionCircle className="text-3xl" />, path: "/medical-query", description: "Ask health questions" },
     { name: "Emergency Navigation", icon: <FaAmbulance className="text-3xl" />, path: "/emergency", description: "Find help fast" },
-    { name: "General Query", icon: <FaComments className="text-3xl" />, section: "general-query", description: "Ask anything" },
+    { name: "General Query", icon: <FaComments className="text-3xl" />, path: "/general-query", description: "Ask anything" },
     { name: "Profile", icon: <FaUser className="text-3xl" />, path: "/profile", description: "Manage your account" }, // Changed to path
   ];
 

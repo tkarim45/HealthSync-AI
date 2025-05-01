@@ -3,9 +3,9 @@ import axios from "axios";
 import { useAuth } from "../context/AuthContext";
 import { motion } from "framer-motion";
 import NavBar from "../components/layout/NavBar";
-import { FaHospital, FaUserShield, FaUserMd, FaBuilding, FaCalendar, FaHeart, FaUserPlus } from "react-icons/fa";
+import { FaHospital, FaUserShield, FaUserMd, FaBuilding, FaCalendar, FaHeart, FaUserPlus, FaEdit, FaTrash } from "react-icons/fa";
 
-// Footer Component (reused from DashboardPage.js)
+// Footer Component
 const Footer = () => {
   const footerVariants = {
     hidden: { opacity: 0, y: 20 },
@@ -29,7 +29,45 @@ const Footer = () => {
 };
 
 // Dynamic Content Component
-const SuperAdminContent = ({ activeSection, hospitals, admins, doctors, departments, appointments, hospitalForm, setHospitalForm, adminForm, setAdminForm, createAdminForm, setCreateAdminForm, handleHospitalSubmit, handleAdminSubmit, handleCreateAdminSubmit, hospitalMessage, hospitalError, adminMessage, adminError, createAdminMessage, createAdminError }) => {
+const SuperAdminContent = ({
+  activeSection,
+  hospitals,
+  admins,
+  doctors,
+  departments,
+  appointments,
+  hospitalForm,
+  setHospitalForm,
+  adminForm,
+  setAdminForm,
+  createAdminForm,
+  setCreateAdminForm,
+  editHospitalForm,
+  setEditHospitalForm,
+  handleHospitalSubmit,
+  handleAdminSubmit,
+  handleCreateAdminSubmit,
+  handleUpdateHospital,
+  handleDeleteHospital,
+  handleDeleteAdmin,
+  handleDeleteDoctor,
+  hospitalMessage,
+  hospitalError,
+  adminMessage,
+  adminError,
+  createAdminMessage,
+  createAdminError,
+  updateHospitalMessage,
+  updateHospitalError,
+  deleteHospitalMessage,
+  deleteHospitalError,
+  deleteAdminMessage,
+  deleteAdminError,
+  deleteDoctorMessage,
+  deleteDoctorError,
+  setActiveSection,
+  isLoading, // New prop for loading state
+}) => {
   const contentVariants = {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
@@ -57,6 +95,7 @@ const SuperAdminContent = ({ activeSection, hospitals, admins, doctors, departme
                     <th className="py-2 px-4 text-gray-700 font-semibold">Address</th>
                     <th className="py-2 px-4 text-gray-700 font-semibold">Latitude</th>
                     <th className="py-2 px-4 text-gray-700 font-semibold">Longitude</th>
+                    <th className="py-2 px-4 text-gray-700 font-semibold">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -66,11 +105,35 @@ const SuperAdminContent = ({ activeSection, hospitals, admins, doctors, departme
                       <td className="py-2 px-4">{hospital.address}</td>
                       <td className="py-2 px-4">{hospital.lat}</td>
                       <td className="py-2 px-4">{hospital.lng}</td>
+                      <td className="py-2 px-4 flex space-x-2">
+                        <button
+                          onClick={() => {
+                            setEditHospitalForm({
+                              id: hospital.id,
+                              name: hospital.name,
+                              address: hospital.address,
+                              lat: hospital.lat,
+                              lng: hospital.lng,
+                            });
+                            setActiveSection("edit-hospital");
+                          }}
+                          className="text-teal-500 hover:text-teal-600"
+                          title="Edit"
+                          disabled={isLoading}
+                        >
+                          <FaEdit />
+                        </button>
+                        <button onClick={() => handleDeleteHospital(hospital.id)} className="text-red-500 hover:text-red-600" title="Delete" disabled={isLoading}>
+                          <FaTrash />
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             )}
+            {deleteHospitalMessage && <p className="text-green-500 text-sm mt-4">{deleteHospitalMessage}</p>}
+            {deleteHospitalError && <p className="text-red-500 text-sm mt-4">{deleteHospitalError}</p>}
           </motion.div>
         );
       case "add-hospital":
@@ -84,30 +147,68 @@ const SuperAdminContent = ({ activeSection, hospitals, admins, doctors, departme
                 <div className="space-y-4">
                   <div>
                     <label className="block text-gray-700 text-sm font-semibold mb-2">Hospital Name</label>
-                    <input type="text" value={hospitalForm.name} onChange={(e) => setHospitalForm({ ...hospitalForm, name: e.target.value })} className="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:border-teal-500" placeholder="e.g., City Hospital" required disabled={admins.length === 0} />
+                    <input type="text" value={hospitalForm.name} onChange={(e) => setHospitalForm({ ...hospitalForm, name: e.target.value })} className="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:border-teal-500" placeholder="e.g., City Hospital" required disabled={admins.length === 0 || isLoading} />
                   </div>
                   <div>
                     <label className="block text-gray-700 text-sm font-semibold mb-2">Address</label>
-                    <input type="text" value={hospitalForm.address} onChange={(e) => setHospitalForm({ ...hospitalForm, address: e.target.value })} className="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:border-teal-500" placeholder="e.g., 123 Main St" required disabled={admins.length === 0} />
+                    <input type="text" value={hospitalForm.address} onChange={(e) => setHospitalForm({ ...hospitalForm, address: e.target.value })} className="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:border-teal-500" placeholder="e.g., 123 Main St" required disabled={admins.length === 0 || isLoading} />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-gray-700 text-sm font-semibold mb-2">Latitude</label>
-                      <input type="number" step="any" value={hospitalForm.lat} onChange={(e) => setHospitalForm({ ...hospitalForm, lat: e.target.value })} className="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:border-teal-500" placeholder="e.g., 40.7128" required disabled={admins.length === 0} />
+                      <input type="number" step="any" value={hospitalForm.lat} onChange={(e) => setHospitalForm({ ...hospitalForm, lat: e.target.value })} className="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:border-teal-500" placeholder="e.g., 40.7128" required disabled={admins.length === 0 || isLoading} />
                     </div>
                     <div>
                       <label className="block text-gray-700 text-sm font-semibold mb-2">Longitude</label>
-                      <input type="number" step="any" value={hospitalForm.lng} onChange={(e) => setHospitalForm({ ...hospitalForm, lng: e.target.value })} className="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:border-teal-500" placeholder="e.g., -74.0060" required disabled={admins.length === 0} />
+                      <input type="number" step="any" value={hospitalForm.lng} onChange={(e) => setHospitalForm({ ...hospitalForm, lng: e.target.value })} className="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:border-teal-500" placeholder="e.g., -74.0060" required disabled={admins.length === 0 || isLoading} />
                     </div>
                   </div>
                 </div>
                 {hospitalMessage && <p className="text-green-500 text-sm mt-4">{hospitalMessage}</p>}
                 {hospitalError && <p className="text-red-500 text-sm mt-4">{hospitalError}</p>}
-                <button type="submit" className="mt-6 w-full p-3 bg-teal-500 text-white rounded-lg font-semibold hover:bg-teal-600 disabled:bg-gray-400" disabled={admins.length === 0}>
-                  Add Hospital
+                <button type="submit" className="mt-6 w-full p-3 bg-teal-500 text-white rounded-lg font-semibold hover:bg-teal-600 disabled:bg-gray-400" disabled={admins.length === 0 || isLoading}>
+                  {isLoading ? "Adding..." : "Add Hospital"}
                 </button>
               </form>
             )}
+          </motion.div>
+        );
+      case "edit-hospital":
+        return (
+          <motion.div variants={contentVariants} initial="hidden" animate="visible" className="bg-white p-6 rounded-lg shadow-lg border border-gray-200">
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">Edit Hospital</h2>
+            <form onSubmit={(e) => handleUpdateHospital(e, editHospitalForm.id)}>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-gray-700 text-sm font-semibold mb-2">Hospital Name</label>
+                  <input type="text" value={editHospitalForm.name} onChange={(e) => setEditHospitalForm({ ...editHospitalForm, name: e.target.value })} className="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:border-teal-500" placeholder="e.g., City Hospital" required disabled={isLoading} />
+                </div>
+                <div>
+                  <label className="block text-gray-700 text-sm font-semibold mb-2">Address</label>
+                  <input type="text" value={editHospitalForm.address} onChange={(e) => setEditHospitalForm({ ...editHospitalForm, address: e.target.value })} className="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:border-teal-500" placeholder="e.g., 123 Main St" required disabled={isLoading} />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-gray-700 text-sm font-semibold mb-2">Latitude</label>
+                    <input type="number" step="any" value={editHospitalForm.lat} onChange={(e) => setEditHospitalForm({ ...editHospitalForm, lat: e.target.value })} className="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:border-teal-500" placeholder="e.g., 40.7128" required disabled={isLoading} />
+                  </div>
+                  <div>
+                    <label className="block text-gray-700 text-sm font-semibold mb-2">Longitude</label>
+                    <input type="number" step="any" value={editHospitalForm.lng} onChange={(e) => setEditHospitalForm({ ...editHospitalForm, lng: e.target.value })} className="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:border-teal-500" placeholder="e.g., -74.0060" required disabled={isLoading} />
+                  </div>
+                </div>
+              </div>
+              {updateHospitalMessage && <p className="text-green-500 text-sm mt-4">{updateHospitalMessage}</p>}
+              {updateHospitalError && <p className="text-red-500 text-sm mt-4">{updateHospitalError}</p>}
+              <div className="flex space-x-4 mt-6">
+                <button type="submit" className="w-full p-3 bg-teal-500 text-white rounded-lg font-semibold hover:bg-teal-600 disabled:bg-gray-400" disabled={isLoading}>
+                  {isLoading ? "Updating..." : "Update Hospital"}
+                </button>
+                <button type="button" onClick={() => setActiveSection("hospitals")} className="w-full p-3 bg-gray-500 text-white rounded-lg font-semibold hover:bg-gray-600 disabled:bg-gray-400" disabled={isLoading}>
+                  Cancel
+                </button>
+              </div>
+            </form>
           </motion.div>
         );
       case "admins":
@@ -124,6 +225,7 @@ const SuperAdminContent = ({ activeSection, hospitals, admins, doctors, departme
                     <th className="py-2 px-4 text-gray-700 font-semibold">Email</th>
                     <th className="py-2 px-4 text-gray-700 font-semibold">Role</th>
                     <th className="py-2 px-4 text-gray-700 font-semibold">Hospital</th>
+                    <th className="py-2 px-4 text-gray-700 font-semibold">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -133,11 +235,18 @@ const SuperAdminContent = ({ activeSection, hospitals, admins, doctors, departme
                       <td className="py-2 px-4">{admin.email}</td>
                       <td className="py-2 px-4">{admin.role}</td>
                       <td className="py-2 px-4">{admin.hospital_name || "None"}</td>
+                      <td className="py-2 px-4">
+                        <button onClick={() => handleDeleteAdmin(admin.id)} className="text-red-500 hover:text-red-600" title="Delete" disabled={isLoading}>
+                          <FaTrash />
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             )}
+            {deleteAdminMessage && <p className="text-green-500 text-sm mt-4">{deleteAdminMessage}</p>}
+            {deleteAdminError && <p className="text-red-500 text-sm mt-4">{deleteAdminError}</p>}
           </motion.div>
         );
       case "assign-admin":
@@ -151,7 +260,7 @@ const SuperAdminContent = ({ activeSection, hospitals, admins, doctors, departme
                 <div className="space-y-4">
                   <div>
                     <label className="block text-gray-700 text-sm font-semibold mb-2">Hospital</label>
-                    <select value={adminForm.hospital_id} onChange={(e) => setAdminForm({ ...adminForm, hospital_id: e.target.value })} className="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:border-teal-500" required>
+                    <select value={adminForm.hospital_id} onChange={(e) => setAdminForm({ ...adminForm, hospital_id: e.target.value })} className="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:border-teal-500" required disabled={isLoading}>
                       <option value="">Select Hospital</option>
                       {hospitals.map((hospital) => (
                         <option key={hospital.id} value={hospital.id}>
@@ -162,7 +271,7 @@ const SuperAdminContent = ({ activeSection, hospitals, admins, doctors, departme
                   </div>
                   <div>
                     <label className="block text-gray-700 text-sm font-semibold mb-2">Admin</label>
-                    <select value={adminForm.admin_id} onChange={(e) => setAdminForm({ ...adminForm, admin_id: e.target.value })} className="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:border-teal-500" required>
+                    <select value={adminForm.admin_id} onChange={(e) => setAdminForm({ ...adminForm, admin_id: e.target.value })} className="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:border-teal-500" required disabled={isLoading}>
                       <option value="">Select Admin</option>
                       {admins.map((admin) => (
                         <option key={admin.id} value={admin.id}>
@@ -174,8 +283,8 @@ const SuperAdminContent = ({ activeSection, hospitals, admins, doctors, departme
                 </div>
                 {adminMessage && <p className="text-green-500 text-sm mt-4">{adminMessage}</p>}
                 {adminError && <p className="text-red-500 text-sm mt-4">{adminError}</p>}
-                <button type="submit" className="mt-6 w-full p-3 bg-teal-500 text-white rounded-lg font-semibold hover:bg-teal-600 disabled:bg-gray-400" disabled={admins.length === 0}>
-                  Assign Admin
+                <button type="submit" className="mt-6 w-full p-3 bg-teal-500 text-white rounded-lg font-semibold hover:bg-teal-600 disabled:bg-gray-400" disabled={admins.length === 0 || isLoading}>
+                  {isLoading ? "Assigning..." : "Assign Admin"}
                 </button>
               </form>
             )}
@@ -189,19 +298,19 @@ const SuperAdminContent = ({ activeSection, hospitals, admins, doctors, departme
               <div className="space-y-4">
                 <div>
                   <label className="block text-gray-700 text-sm font-semibold mb-2">Username</label>
-                  <input type="text" value={createAdminForm.username} onChange={(e) => setCreateAdminForm({ ...createAdminForm, username: e.target.value })} className="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:border-teal-500" placeholder="e.g., admin1" required />
+                  <input type="text" value={createAdminForm.username} onChange={(e) => setCreateAdminForm({ ...createAdminForm, username: e.target.value })} className="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:border-teal-500" placeholder="e.g., admin1" required disabled={isLoading} />
                 </div>
                 <div>
                   <label className="block text-gray-700 text-sm font-semibold mb-2">Email</label>
-                  <input type="email" value={createAdminForm.email} onChange={(e) => setCreateAdminForm({ ...createAdminForm, email: e.target.value })} className="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:border-teal-500" placeholder="e.g., admin1@example.com" required />
+                  <input type="email" value={createAdminForm.email} onChange={(e) => setCreateAdminForm({ ...createAdminForm, email: e.target.value })} className="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:border-teal-500" placeholder="e.g., admin1@example.com" required disabled={isLoading} />
                 </div>
                 <div>
                   <label className="block text-gray-700 text-sm font-semibold mb-2">Password</label>
-                  <input type="password" value={createAdminForm.password} onChange={(e) => setCreateAdminForm({ ...createAdminForm, password: e.target.value })} className="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:border-teal-500" placeholder="Enter password" required />
+                  <input type="password" value={createAdminForm.password} onChange={(e) => setCreateAdminForm({ ...createAdminForm, password: e.target.value })} className="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:border-teal-500" placeholder="Enter password" required disabled={isLoading} />
                 </div>
                 <div>
                   <label className="block text-gray-700 text-sm font-semibold mb-2">Assign to Hospital (Optional)</label>
-                  <select value={createAdminForm.hospital_id} onChange={(e) => setCreateAdminForm({ ...createAdminForm, hospital_id: e.target.value })} className="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:border-teal-500">
+                  <select value={createAdminForm.hospital_id} onChange={(e) => setCreateAdminForm({ ...createAdminForm, hospital_id: e.target.value })} className="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:border-teal-500" disabled={isLoading}>
                     <option value="">No Hospital</option>
                     {hospitals.map((hospital) => (
                       <option key={hospital.id} value={hospital.id}>
@@ -213,8 +322,8 @@ const SuperAdminContent = ({ activeSection, hospitals, admins, doctors, departme
               </div>
               {createAdminMessage && <p className="text-green-500 text-sm mt-4">{createAdminMessage}</p>}
               {createAdminError && <p className="text-red-500 text-sm mt-4">{createAdminError}</p>}
-              <button type="submit" className="mt-6 w-full p-3 bg-teal-500 text-white rounded-lg font-semibold hover:bg-teal-600">
-                Create Admin
+              <button type="submit" className="mt-6 w-full p-3 bg-teal-500 text-white rounded-lg font-semibold hover:bg-teal-600 disabled:bg-gray-400" disabled={isLoading}>
+                {isLoading ? "Creating..." : "Create Admin"}
               </button>
             </form>
           </motion.div>
@@ -236,6 +345,7 @@ const SuperAdminContent = ({ activeSection, hospitals, admins, doctors, departme
                     <th className="py-2 px-4 text-gray-700 font-semibold">Title</th>
                     <th className="py-2 px-4 text-gray-700 font-semibold">Phone</th>
                     <th className="py-2 px-4 text-gray-700 font-semibold">Bio</th>
+                    <th className="py-2 px-4 text-gray-700 font-semibold">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -248,11 +358,18 @@ const SuperAdminContent = ({ activeSection, hospitals, admins, doctors, departme
                       <td className="py-2 px-4">{doctor.title}</td>
                       <td className="py-2 px-4">{doctor.phone || "N/A"}</td>
                       <td className="py-2 px-4">{doctor.bio || "N/A"}</td>
+                      <td className="py-2 px-4">
+                        <button onClick={() => handleDeleteDoctor(doctor.user_id)} className="text-red-500 hover:text-red-600" title="Delete" disabled={isLoading}>
+                          <FaTrash />
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             )}
+            {deleteDoctorMessage && <p className="text-green-500 text-sm mt-4">{deleteDoctorMessage}</p>}
+            {deleteDoctorError && <p className="text-red-500 text-sm mt-4">{deleteDoctorError}</p>}
           </motion.div>
         );
       case "departments":
@@ -348,16 +465,53 @@ const SuperAdminDashboard = () => {
     password: "",
     hospital_id: "",
   });
+  const [editHospitalForm, setEditHospitalForm] = useState({
+    id: "",
+    name: "",
+    address: "",
+    lat: "",
+    lng: "",
+  });
   const [hospitalMessage, setHospitalMessage] = useState("");
-  const [adminMessage, setAdminMessage] = useState("");
   const [hospitalError, setHospitalError] = useState("");
+  const [adminMessage, setAdminMessage] = useState("");
   const [adminError, setAdminError] = useState("");
   const [createAdminMessage, setCreateAdminMessage] = useState("");
   const [createAdminError, setCreateAdminError] = useState("");
+  const [updateHospitalMessage, setUpdateHospitalMessage] = useState("");
+  const [updateHospitalError, setUpdateHospitalError] = useState("");
+  const [deleteHospitalMessage, setDeleteHospitalMessage] = useState("");
+  const [deleteHospitalError, setDeleteHospitalError] = useState("");
+  const [deleteAdminMessage, setDeleteAdminMessage] = useState("");
+  const [deleteAdminError, setDeleteAdminError] = useState("");
+  const [deleteDoctorMessage, setDeleteDoctorMessage] = useState("");
+  const [deleteDoctorError, setDeleteDoctorError] = useState("");
+  const [isLoading, setIsLoading] = useState(false); // New state for loading
+
+  // Clear messages after 5 seconds
+  useEffect(() => {
+    const timers = [];
+    if (hospitalMessage) timers.push(setTimeout(() => setHospitalMessage(""), 5000));
+    if (hospitalError) timers.push(setTimeout(() => setHospitalError(""), 5000));
+    if (adminMessage) timers.push(setTimeout(() => setAdminMessage(""), 5000));
+    if (adminError) timers.push(setTimeout(() => setAdminError(""), 5000));
+    if (createAdminMessage) timers.push(setTimeout(() => setCreateAdminMessage(""), 5000));
+    if (createAdminError) timers.push(setTimeout(() => setCreateAdminError(""), 5000));
+    if (updateHospitalMessage) timers.push(setTimeout(() => setUpdateHospitalMessage(""), 5000));
+    if (updateHospitalError) timers.push(setTimeout(() => setUpdateHospitalError(""), 5000));
+    if (deleteHospitalMessage) timers.push(setTimeout(() => setDeleteHospitalMessage(""), 5000));
+    if (deleteHospitalError) timers.push(setTimeout(() => setDeleteHospitalError(""), 5000));
+    if (deleteAdminMessage) timers.push(setTimeout(() => setDeleteAdminMessage(""), 5000));
+    if (deleteAdminError) timers.push(setTimeout(() => setDeleteAdminError(""), 5000));
+    if (deleteDoctorMessage) timers.push(setTimeout(() => setDeleteDoctorMessage(""), 5000));
+    if (deleteDoctorError) timers.push(setTimeout(() => setDeleteDoctorError(""), 5000));
+    return () => timers.forEach(clearTimeout);
+  }, [hospitalMessage, hospitalError, adminMessage, adminError, createAdminMessage, createAdminError, updateHospitalMessage, updateHospitalError, deleteHospitalMessage, deleteHospitalError, deleteAdminMessage, deleteAdminError, deleteDoctorMessage, deleteDoctorError]);
 
   // Fetch all data
   useEffect(() => {
     const fetchData = async () => {
+      setIsLoading(true);
       try {
         const [hospitalsRes, adminsRes, appointmentsRes, departmentsRes, doctorsRes] = await Promise.all([
           axios.get("http://localhost:8000/api/hospitals", { headers: { Authorization: `Bearer ${token}` } }),
@@ -373,16 +527,20 @@ const SuperAdminDashboard = () => {
         setDoctors(doctorsRes.data);
       } catch (error) {
         console.error("Error fetching data:", error);
+        setHospitalError("Failed to load data. Please try again.");
+      } finally {
+        setIsLoading(false);
       }
     };
     if (token) fetchData();
-  }, [token]); // Only depend on token
+  }, [token]);
 
-  // Handle hospital form submission
+  // Handle hospital form submission (create)
   const handleHospitalSubmit = async (e) => {
     e.preventDefault();
     setHospitalMessage("");
     setHospitalError("");
+    setIsLoading(true);
     try {
       const response = await fetch("http://localhost:8000/api/hospitals", {
         method: "POST",
@@ -411,6 +569,143 @@ const SuperAdminDashboard = () => {
       }
     } catch (err) {
       setHospitalError("Error adding hospital: " + err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle hospital update
+  const handleUpdateHospital = async (e, hospitalId) => {
+    e.preventDefault();
+    setUpdateHospitalMessage("");
+    setUpdateHospitalError("");
+    setIsLoading(true);
+    try {
+      const response = await fetch(`http://localhost:8000/api/hospitals/${hospitalId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: editHospitalForm.name,
+          address: editHospitalForm.address,
+          lat: parseFloat(editHospitalForm.lat),
+          lng: parseFloat(editHospitalForm.lng),
+        }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setUpdateHospitalMessage("Hospital updated successfully!");
+        setEditHospitalForm({ id: "", name: "", address: "", lat: "", lng: "" });
+        const hospitalResponse = await fetch("http://localhost:8000/api/hospitals", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const hospitalData = await hospitalResponse.json();
+        if (hospitalResponse.ok) setHospitals(hospitalData);
+        setActiveSection("hospitals");
+      } else {
+        setUpdateHospitalError(data.detail || "Failed to update hospital");
+      }
+    } catch (err) {
+      setUpdateHospitalError("Error updating hospital: " + err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle hospital deletion
+  const handleDeleteHospital = async (hospitalId) => {
+    if (!window.confirm("Are you sure you want to delete this hospital?")) return;
+    setDeleteHospitalMessage("");
+    setDeleteHospitalError("");
+    setIsLoading(true);
+    try {
+      const response = await fetch(`http://localhost:8000/api/hospitals/${hospitalId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setDeleteHospitalMessage("Hospital deleted successfully!");
+        const hospitalResponse = await fetch("http://localhost:8000/api/hospitals", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const hospitalData = await hospitalResponse.json();
+        if (hospitalResponse.ok) setHospitals(hospitalData);
+      } else {
+        setDeleteHospitalError(data.detail || "Failed to delete hospital");
+      }
+    } catch (err) {
+      setDeleteHospitalError("Error deleting hospital: " + err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle admin deletion
+  const handleDeleteAdmin = async (adminId) => {
+    if (!window.confirm("Are you sure you want to delete this admin?")) return;
+    setDeleteAdminMessage("");
+    setDeleteAdminError("");
+    setIsLoading(true);
+    try {
+      const response = await fetch(`http://localhost:8000/api/admins/${adminId}`, {
+        // Updated endpoint
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setDeleteAdminMessage(data.detail || "Admin deleted successfully!"); // Use backend response
+        const adminResponse = await fetch("http://localhost:8000/api/admins", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const adminData = await adminResponse.json();
+        if (adminResponse.ok) setAdmins(adminData);
+      } else {
+        setDeleteAdminError(data.detail || "Failed to delete admin");
+      }
+    } catch (err) {
+      setDeleteAdminError("Error deleting admin: " + err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle doctor deletion
+  const handleDeleteDoctor = async (doctorId) => {
+    if (!window.confirm("Are you sure you want to delete this doctor?")) return;
+    setDeleteDoctorMessage("");
+    setDeleteDoctorError("");
+    setIsLoading(true);
+    try {
+      const response = await fetch(`http://localhost:8000/api/doctors/${doctorId}`, {
+        // Updated endpoint
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setDeleteDoctorMessage(data.detail || "Doctor deleted successfully!"); // Use backend response
+        const doctorResponse = await fetch("http://localhost:8000/api/doctors", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const doctorData = await doctorResponse.json();
+        if (doctorResponse.ok) setDoctors(doctorData);
+      } else {
+        setDeleteDoctorError(data.detail || "Failed to delete doctor");
+      }
+    } catch (err) {
+      setDeleteDoctorError("Error deleting doctor: " + err.message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -419,21 +714,21 @@ const SuperAdminDashboard = () => {
     e.preventDefault();
     setAdminMessage("");
     setAdminError("");
+    setIsLoading(true);
     try {
-      const response = await fetch("http://localhost:8000/api/hospital-admins", {
+      const response = await fetch(`http://localhost:8000/api/hospitals/${adminForm.hospital_id}/assign_admin`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          hospital_id: adminForm.hospital_id,
-          admin_id: adminForm.admin_id,
+          user_id: adminForm.admin_id,
         }),
       });
       const data = await response.json();
       if (response.ok) {
-        setAdminMessage(data.message);
+        setAdminMessage(data.detail || "Admin assigned successfully!");
         setAdminForm({ hospital_id: "", admin_id: "" });
         const adminResponse = await fetch("http://localhost:8000/api/admins", {
           headers: { Authorization: `Bearer ${token}` },
@@ -445,6 +740,8 @@ const SuperAdminDashboard = () => {
       }
     } catch (err) {
       setAdminError("Error assigning admin: " + err.message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -453,6 +750,7 @@ const SuperAdminDashboard = () => {
     e.preventDefault();
     setCreateAdminMessage("");
     setCreateAdminError("");
+    setIsLoading(true);
     try {
       const response = await fetch("http://localhost:8000/api/admins", {
         method: "POST",
@@ -481,16 +779,18 @@ const SuperAdminDashboard = () => {
       }
     } catch (err) {
       setCreateAdminError("Error creating admin: " + err.message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const dashboardCards = [
-    { name: "View Hospitals", icon: <FaHospital className="text-3xl" />, section: "hospitals", description: "List all hospitals" },
+    { name: "View Hospitals", icon: <FaHospital className="text-3xl" />, section: "hospitals", description: "List, update, or delete hospitals" },
     { name: "Add Hospital", icon: <FaHospital className="text-3xl" />, section: "add-hospital", description: "Create a new hospital" },
-    { name: "View Admins", icon: <FaUserShield className="text-3xl" />, section: "admins", description: "List all admins" },
+    { name: "View Admins", icon: <FaUserShield className="text-3xl" />, section: "admins", description: "List or delete admins" },
     { name: "Assign Admin", icon: <FaUserShield className="text-3xl" />, section: "assign-admin", description: "Assign admin to hospital" },
     { name: "Create Admin", icon: <FaUserPlus className="text-3xl" />, section: "create-admin", description: "Create a new admin user" },
-    { name: "View Doctors", icon: <FaUserMd className="text-3xl" />, section: "doctors", description: "List all doctors" },
+    { name: "View Doctors", icon: <FaUserMd className="text-3xl" />, section: "doctors", description: "List or delete doctors" },
     { name: "View Departments", icon: <FaBuilding className="text-3xl" />, section: "departments", description: "List all departments" },
     { name: "View Appointments", icon: <FaCalendar className="text-3xl" />, section: "appointments", description: "List all appointments" },
   ];
@@ -514,7 +814,7 @@ const SuperAdminDashboard = () => {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
             {dashboardCards.map((card, index) => (
-              <motion.div key={card.section} className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center text-center cursor-pointer border border-gray-200 hover:border-teal-500" variants={cardVariants} initial="hidden" animate="visible" whileHover="hover" transition={{ delay: index * 0.1 }} onClick={() => setActiveSection(card.section)}>
+              <motion.div key={card.section} className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center text-center cursor-pointer border border-gray-200 hover:border-teal-500" variants={cardVariants} initial="hidden" animate="visible" whileHover="hover" transition={{ delay: index * 0.1 }} onClick={() => setActiveSection(card.section)} disabled={isLoading}>
                 <div className="text-teal-500 mb-4">{card.icon}</div>
                 <h2 className="text-xl font-semibold text-gray-800 mb-2">{card.name}</h2>
                 <p className="text-gray-600">{card.description}</p>
@@ -535,15 +835,31 @@ const SuperAdminDashboard = () => {
             setAdminForm={setAdminForm}
             createAdminForm={createAdminForm}
             setCreateAdminForm={setCreateAdminForm}
+            editHospitalForm={editHospitalForm}
+            setEditHospitalForm={setEditHospitalForm}
             handleHospitalSubmit={handleHospitalSubmit}
             handleAdminSubmit={handleAdminSubmit}
             handleCreateAdminSubmit={handleCreateAdminSubmit}
+            handleUpdateHospital={handleUpdateHospital}
+            handleDeleteHospital={handleDeleteHospital}
+            handleDeleteAdmin={handleDeleteAdmin}
+            handleDeleteDoctor={handleDeleteDoctor}
             hospitalMessage={hospitalMessage}
             hospitalError={hospitalError}
             adminMessage={adminMessage}
             adminError={adminError}
             createAdminMessage={createAdminMessage}
             createAdminError={createAdminError}
+            updateHospitalMessage={updateHospitalMessage}
+            updateHospitalError={updateHospitalError}
+            deleteHospitalMessage={deleteHospitalMessage}
+            deleteHospitalError={deleteHospitalError}
+            deleteAdminMessage={deleteAdminMessage}
+            deleteAdminError={deleteAdminError}
+            deleteDoctorMessage={deleteDoctorMessage}
+            deleteDoctorError={deleteDoctorError}
+            setActiveSection={setActiveSection}
+            isLoading={isLoading} // Pass loading state
           />
         </div>
       </main>

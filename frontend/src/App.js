@@ -16,6 +16,7 @@ import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import DoctorDashboard from "./pages/DoctorDashboard";
 import BookAppointmentPage from "./pages/BookAppointmentPage";
+import GeneralQueryPage from "./pages/GeneralQueryPage";
 
 function App() {
   return (
@@ -39,6 +40,8 @@ function App() {
               <Route path="/medical-query" element={<MedicalQueryPage />} />
               <Route path="/disease-detection" element={<DiseaseDetectionPage />} />
               <Route path="/book-appointment" element={<BookAppointmentPage />} />
+              <Route path="/general-query" element={<GeneralQueryPage />} />
+
               {/* Redirect to home page for any unknown routes */}
               <Route path="*" element={<Navigate to="/" />} />
             </Routes>
