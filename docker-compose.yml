@@ -1,0 +1,46 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - JWT_SECRET=your_jwt_secret_key
+      - JWT_ALGORITHM=HS256
+      - ACCESS_TOKEN_EXPIRE_MINUTES=60
+      - PUBLIC_API_URL=https://e6ca-34-125-166-140.ngrok-free.app/generate
+      - ALLOWED_ORIGINS=http://localhost:3000
+      - GOOGLE_API_KEY=your_google_api_key
+      - PINECONE_API_KEY=your_pinecone_api_key
+      - EMAIL_SENDER=your_email_sender
+      - EMAIL_PASSWORD=your_email_password
+      - SMTP_SERVER=smtp.gmail.com
+      - SMTP_PORT=587
+      - DB_PATH=/app/healthsync.db
+      - LLAMA_PARSER_API_KEY=your_llama_parser_api_key
+    volumes:
+      - db_data:/app
+    networks:
+      - app-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  db_data:
