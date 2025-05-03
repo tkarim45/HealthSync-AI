@@ -1540,6 +1540,82 @@ async def general_query(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/medical-history", response_model=List[MedicalHistoryResponse])
+async def get_medical_history(current_user: dict = Depends(get_current_user)):
+    user_id = current_user.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=400, detail="Invalid user data")
+
+    conn = sqlite3.connect(settings.DB_PATH)
+    c = conn.cursor()
+    c.execute(
+        """
+        SELECT id, user_id, conditions, allergies, notes, updated_at, updated_by
+        FROM medical_history
+        WHERE user_id = ?
+        """,
+        (user_id,),
+    )
+    records = [
+        MedicalHistoryResponse(
+            id=row[0],
+            user_id=row[1],
+            conditions=row[2],
+            allergies=row[3],
+            notes=row[4],
+            updated_at=row[5],
+            updated_by=row[6],
+        )
+        for row in c.fetchall()
+    ]
+    conn.close()
+    return records
+
+
+@app.post("/api/medical-history", response_model=MedicalHistoryResponse)
+async def create_medical_history(
+    medical_history: MedicalHistoryCreate,
+    current_user: dict = Depends(get_current_user),
+):
+    user_id = current_user.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=400, detail="Invalid user data")
+
+    record_id = str(uuid.uuid4())
+    updated_at = datetime.utcnow().isoformat()
+
+    conn = sqlite3.connect(settings.DB_PATH)
+    c = conn.cursor()
+    c.execute(
+        """
+        INSERT INTO medical_history (id, user_id, conditions, allergies, notes, updated_at, updated_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            record_id,
+            user_id,
+            medical_history.conditions,
+            medical_history.allergies,
+            medical_history.notes,
+            updated_at,
+            user_id,
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+    logger.info(f"Created medical history record {record_id} for user {user_id}")
+    return MedicalHistoryResponse(
+        id=record_id,
+        user_id=user_id,
+        conditions=medical_history.conditions,
+        allergies=medical_history.allergies,
+        notes=medical_history.notes,
+        updated_at=updated_at,
+        updated_by=user_id,
+    )
+
+
 if __name__ == "__main__":
     import uvicorn
 

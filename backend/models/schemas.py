@@ -137,6 +137,13 @@ class DoctorCreate(BaseModel):
     bio: Optional[str] = None
 
 
+class MedicalHistoryCreate(BaseModel):
+    conditions: Optional[str] = None
+    allergies: Optional[str] = None
+    notes: Optional[str] = None
+    updated_by: Optional[str] = None
+
+
 class MedicalHistoryResponse(BaseModel):
     id: str
     user_id: str

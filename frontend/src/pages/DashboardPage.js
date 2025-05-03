@@ -36,7 +36,7 @@ const DashboardPage = () => {
   const [activeSection, setActiveSection] = useState("welcome");
 
   const dashboardCards = [
-    { name: "Medical History", icon: <FaHistory className="text-3xl" />, section: "medical-history", description: "View your health records" },
+    { name: "Medical History", icon: <FaHistory className="text-3xl" />, path: "/medical-history", description: "View your health records" },
     { name: "Book Appointment", icon: <FaCalendar className="text-3xl" />, path: "/book-appointment", description: "Schedule with AI" },
     { name: "Disease Detection", icon: <FaCamera className="text-3xl" />, path: "/disease-detection", description: "Analyze images" },
     { name: "Analyze Blood Reports", icon: <FaQuestionCircle className="text-3xl" />, path: "/medical-query", description: "Ask health questions" },

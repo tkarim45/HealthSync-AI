@@ -17,6 +17,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import DoctorDashboard from "./pages/DoctorDashboard";
 import BookAppointmentPage from "./pages/BookAppointmentPage";
 import GeneralQueryPage from "./pages/GeneralQueryPage";
+import MedicalHistoryPage from "./pages/MedicalHistoryPage";
 
 function App() {
   return (
@@ -41,6 +42,7 @@ function App() {
               <Route path="/disease-detection" element={<DiseaseDetectionPage />} />
               <Route path="/book-appointment" element={<BookAppointmentPage />} />
               <Route path="/general-query" element={<GeneralQueryPage />} />
+              <Route path="/medical-history" element={<MedicalHistoryPage />} />
 
               {/* Redirect to home page for any unknown routes */}
               <Route path="*" element={<Navigate to="/" />} />

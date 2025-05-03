@@ -3,3 +3,11 @@ uvicorn
 python-jwt
 pydantic
 sqlite3
+pandas 
+langchain 
+langchain-google-genai 
+langchain_community 
+sentence-transformers 
+pinecone
+langchain-pinecone
+

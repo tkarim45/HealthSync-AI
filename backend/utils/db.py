@@ -1,6 +1,8 @@
 import sqlite3
 import logging
 from config.settings import settings
+import uuid
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +102,7 @@ def init_db():
             user_id TEXT NOT NULL,      -- Patient
             doctor_id TEXT NOT NULL,    -- Doctor
             department_id TEXT NOT NULL,
+            hospital_id TEXT NOT NULL,
             appointment_date TEXT NOT NULL,  -- e.g., '2025-04-25'
             start_time TEXT NOT NULL,   -- e.g., '09:00'
             end_time TEXT NOT NULL,     -- e.g., '09:30'
@@ -108,6 +111,7 @@ def init_db():
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
             FOREIGN KEY (doctor_id) REFERENCES users(id) ON DELETE CASCADE,
             FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE CASCADE,
+            FOREIGN KEY (hospital_id) REFERENCES hospitals(id) ON DELETE CASCADE,
             UNIQUE (doctor_id, appointment_date, start_time)
         )
     """
@@ -115,19 +119,20 @@ def init_db():
     # Medical history table
     c.execute(
         """
-    CREATE TABLE IF NOT EXISTS medical_history (
-        id TEXT PRIMARY KEY,
-        user_id TEXT NOT NULL,
-        conditions TEXT,
-        allergies TEXT,
-        notes TEXT,
-        updated_at TEXT,
-        updated_by TEXT,
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-        FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
-    )
+        CREATE TABLE IF NOT EXISTS medical_history (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            conditions TEXT,
+            allergies TEXT,
+            notes TEXT,
+            updated_at TEXT,
+            updated_by TEXT,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
+        )
     """
     )
+    # General chat history table
     c.execute(
         """
         CREATE TABLE IF NOT EXISTS general_chat_history (
@@ -140,12 +145,56 @@ def init_db():
         )
     """
     )
-    # Hospital admins, departments, doctors, availability, appointments, medical history tables
-    # (Similar structure as in original main.py, omitted for brevity)
-
     conn.commit()
     conn.close()
     logger.info("Database initialized successfully")
+
+
+def insert_dummy_medical_history():
+    conn = sqlite3.connect(settings.DB_PATH)
+    c = conn.cursor()
+    user_id = "0d3074c3-12e5-4517-b661-08c7e390296e"
+    dummy_records = [
+        {
+            "id": str(uuid.uuid4()),
+            "user_id": user_id,
+            "conditions": "Hypertension, Type 2 Diabetes",
+            "allergies": "Penicillin, Peanuts",
+            "notes": "Patient diagnosed with hypertension in 2020. Type 2 Diabetes managed with metformin.",
+            "updated_at": datetime.utcnow().isoformat(),
+            "updated_by": user_id,
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "user_id": user_id,
+            "conditions": "Asthma",
+            "allergies": "Dust mites",
+            "notes": "Asthma diagnosed in 2018. Uses albuterol inhaler as needed.",
+            "updated_at": datetime.utcnow().isoformat(),
+            "updated_by": user_id,
+        },
+    ]
+    for record in dummy_records:
+        c.execute(
+            """
+            INSERT OR REPLACE INTO medical_history (id, user_id, conditions, allergies, notes, updated_at, updated_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                record["id"],
+                record["user_id"],
+                record["conditions"],
+                record["allergies"],
+                record["notes"],
+                record["updated_at"],
+                record["updated_by"],
+            ),
+        )
+    conn.commit()
+    conn.close()
+    logger.info(
+        f"Inserted {len(dummy_records)} dummy medical history records for user {user_id}"
+    )
 
 
 def get_db_connection():
