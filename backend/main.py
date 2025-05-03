@@ -28,6 +28,7 @@ from routes.auth import *
 from routes import auth
 from utils.pineconeutils import *
 from utils.email import *
+from utils.agents import *
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -259,9 +260,19 @@ async def assign_hospital_admin(
 
 
 @app.post("/chatbot")
-async def chatbot(request: ChatbotRequest):
-    logger.info(f"Chatbot query: {request.query}")
-    return {"response": "Hello, How are you doing? I hope you are doing good"}
+async def chatbot(
+    request: ChatbotRequest, current_user: dict = Depends(get_current_user)
+):
+    """Handle chatbot queries using the agentic system."""
+    try:
+        logger.info(f"Chatbot query: {request.query}")
+        response = await appointment_booking_agent(
+            request.query, current_user["user_id"]
+        )
+        return response
+    except Exception as e:
+        logger.error(f"Error in chatbot: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/api/emergency/hospitals", response_model=dict)
@@ -1505,38 +1516,27 @@ async def delete_doctor(
 async def general_query(
     request: GeneralQueryRequest, current_user: dict = Depends(get_current_user)
 ):
-    """Process general medical queries using the RAG system."""
+    """Process general medical queries using the agentic system."""
     try:
         query = request.query
         if not query.strip():
             logger.error("Empty query provided")
-            raise HTTPException(
-                status_code=400, detail="A non-empty query is required."
+            raise HTTPException(status_code=400, detail="A non-empty query is required")
+
+        logger.info(f"Processing query for user {current_user['user_id']}: {query}")
+        response = await appointment_booking_agent(query, current_user["user_id"])
+
+        # Log response safely, handling both string and dictionary cases
+        if isinstance(response["response"], str):
+            logger.info(
+                f"Query processed successfully: {response['response'][:100]}..."
             )
+        else:
+            logger.info(f"Query processed successfully: {response['response']}")
 
-        logger.info(
-            f"Processing general query for user {current_user['user_id']}: {query}"
-        )
-
-        # Get recent chat history for context
-        history = get_general_chat_history(current_user["user_id"])
-        history_text = ""
-        for entry in history:
-            history_text += (
-                f"User: {entry['query']}\nAssistant: {entry['response']}\n\n"
-            )
-
-        # Process query with RAG system
-        response = retrieval_chain.invoke({"input": query, "history": history_text})
-        answer = response.get("answer", "No answer found.")
-
-        # Store chat history
-        store_general_chat_history(current_user["user_id"], query, answer)
-
-        logger.info(f"Query processed successfully: {answer[:100]}...")
-        return {"response": answer}
+        return response
     except Exception as e:
-        logger.error(f"Error processing general query: {str(e)}")
+        logger.error(f"Error processing query: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 

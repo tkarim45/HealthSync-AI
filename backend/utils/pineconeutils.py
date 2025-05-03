@@ -89,19 +89,21 @@ def initialize_rag_system():
         )
         prompt_template = ChatPromptTemplate.from_template(
             """
-            **Note:** You are an AI assistant using only the provided context from a dataset of patient-doctor conversations. You are not a doctor. Do not provide medical advice beyond the context. If the context lacks information, say so. Use the conversation history to understand references (e.g., pronouns like 'it') if relevant.
+                **Note:** You are an AI assistant using only the provided context from a dataset of patient-doctor conversations. You are not a doctor. Do not provide medical advice beyond the context. If the context lacks information, say so. Use the conversation history to understand references (e.g., pronouns like 'it') if relevant.
 
-            **Conversation History (Recent Queries and Answers):**
-            {history}
+                **Conversation History (Recent Queries and Answers):**
+                {history}
 
-            **Context (from dataset):**
-            {context}
+                **Context (from dataset):**
+                {context}
 
-            **Question:**
-            {input}
+                **Question:**
+                {input}
 
-            **Answer (based only on context, using history for clarity if needed):**
-            """
+                **Answer (based only on context, using history for clarity if needed):**
+                If the question is about hospitals, doctors, or appointments, respond: "Please use the appointment booking system for this query."
+                Otherwise, provide an answer based on the context.
+                """
         )
         document_chain = create_stuff_documents_chain(llm, prompt_template)
         retrieval_chain = create_retrieval_chain(retriever, document_chain)
