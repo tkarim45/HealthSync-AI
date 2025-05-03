@@ -14,6 +14,12 @@ from datetime import datetime, timedelta
 import uuid
 import logging
 import json
+import asyncio
+
+# Assuming send_confirmation_email is defined elsewhere and imported
+from utils.email import (
+    send_confirmation_email,
+)  # Adjust import based on your project structure
 
 logger = logging.getLogger(__name__)
 
@@ -116,7 +122,6 @@ def get_doctor_availability(doctor_id: str, date: Optional[str] = None) -> List[
     for slot in availability:
         slot_date = date
         if not slot_date:
-            # Calculate next occurrence of day_of_week
             today = datetime.now()
             days_of_week = [
                 "Monday",
@@ -131,7 +136,7 @@ def get_doctor_availability(doctor_id: str, date: Optional[str] = None) -> List[
             current_day_index = today.weekday()
             days_until_target = (target_day_index - current_day_index + 7) % 7
             if days_until_target == 0:
-                days_until_target = 7  # Next week if today
+                days_until_target = 7
             slot_date = (today + timedelta(days=days_until_target)).strftime("%Y-%m-%d")
 
         c.execute(
@@ -145,6 +150,35 @@ def get_doctor_availability(doctor_id: str, date: Optional[str] = None) -> List[
 
     conn.close()
     return availability
+
+
+async def async_send_confirmation_email(
+    recipient_email: str,
+    patient_username: str,
+    doctor_username: str,
+    department_name: str,
+    appointment_date: str,
+    start_time: str,
+    hospital_id: str,
+):
+    loop = asyncio.get_event_loop()
+    try:
+        await loop.run_in_executor(
+            None,
+            send_confirmation_email,
+            recipient_email,
+            patient_username,
+            doctor_username,
+            department_name,
+            appointment_date,
+            start_time,
+            hospital_id,
+        )
+        logger.info(f"Confirmation email sent to {recipient_email}")
+    except Exception as e:
+        logger.error(
+            f"Failed to send confirmation email to {recipient_email}: {str(e)}"
+        )
 
 
 def book_appointment(
@@ -167,7 +201,7 @@ def book_appointment(
     conn = sqlite3.connect(settings.DB_PATH)
     c = conn.cursor()
 
-    # Verify doctor
+    # Verify doctor exists and get username
     c.execute(
         """
         SELECT u.id, u.username
@@ -186,7 +220,7 @@ def book_appointment(
         raise ValueError(f"Invalid doctor query result type: {type(doctor)}")
     doctor_id, doctor_username = doctor
 
-    # Verify department
+    # Verify department exists and get name
     c.execute(
         """
         SELECT d.id, d.name
@@ -205,7 +239,7 @@ def book_appointment(
         raise ValueError(f"Invalid department query result type: {type(department)}")
     department_id, department_name = department
 
-    # Verify hospital
+    # Verify hospital exists
     c.execute("SELECT id FROM hospitals WHERE id = ?", (hospital_id,))
     hospital = c.fetchone()
     logger.debug(f"Hospital query: result={hospital}, type={type(hospital)}")
@@ -256,9 +290,9 @@ def book_appointment(
         conn.close()
         raise ValueError("Slot already booked")
 
-    # Fetch patient username
+    # Fetch patient's username and email
     c.execute(
-        "SELECT username FROM users WHERE id = ?",
+        "SELECT username, email FROM users WHERE id = ?",
         (user_id,),
     )
     user = c.fetchone()
@@ -269,7 +303,7 @@ def book_appointment(
     if not isinstance(user, tuple):
         conn.close()
         raise ValueError(f"Invalid user query result type: {type(user)}")
-    patient_username = user[0]
+    patient_username, patient_email = user
 
     # Insert appointment
     appointment_id = str(uuid.uuid4())
@@ -296,6 +330,21 @@ def book_appointment(
     )
     conn.commit()
     conn.close()
+
+    # Send confirmation email in the background
+    if patient_email:
+        logger.debug(f"Scheduling confirmation email to {patient_email}")
+        asyncio.create_task(
+            async_send_confirmation_email(
+                recipient_email=patient_email,
+                patient_username=patient_username,
+                doctor_username=doctor_username,
+                department_name=department_name,
+                appointment_date=appointment_date,
+                start_time=start_time,
+                hospital_id=hospital_id,
+            )
+        )
 
     booking = {
         "id": appointment_id,
