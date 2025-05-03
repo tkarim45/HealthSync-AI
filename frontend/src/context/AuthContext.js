@@ -11,7 +11,6 @@ export const AuthProvider = ({ children }) => {
   const location = useLocation();
 
   useEffect(() => {
-    // Update localStorage only if user or token changes
     if (user) {
       localStorage.setItem("user", JSON.stringify(user));
     } else {
@@ -23,7 +22,6 @@ export const AuthProvider = ({ children }) => {
       localStorage.removeItem("token");
     }
 
-    // Redirect only on initial login or role change
     if (user && token && location.pathname === "/login") {
       console.log("Redirecting after login, role:", user.role);
       switch (user.role) {
@@ -48,10 +46,13 @@ export const AuthProvider = ({ children }) => {
   const login = async ({ username, password }) => {
     setLoading(true);
     try {
-      console.log("Fetching login from: http://localhost:8000/api/auth/login");
-      const response = await fetch("http://localhost:8000/api/auth/login", {
+      console.log(`Fetching login from: ${process.env.REACT_APP_API_URL}/api/auth/login`);
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/login`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
         body: JSON.stringify({ username, password }),
       });
       const text = await response.text();
@@ -73,10 +74,13 @@ export const AuthProvider = ({ children }) => {
   const signup = async ({ username, email, password }) => {
     setLoading(true);
     try {
-      console.log("Fetching signup from: http://localhost:8000/api/auth/signup");
-      const response = await fetch("http://localhost:8000/api/auth/signup", {
+      console.log(`Fetching signup from: ${process.env.REACT_APP_API_URL}/api/auth/signup`);
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/signup`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
         body: JSON.stringify({ username, email, password }),
       });
       const text = await response.text();

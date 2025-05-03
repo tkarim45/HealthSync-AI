@@ -1,4 +1,3 @@
-# Use a slim Python 3.11 base image for a smaller footprint
 FROM python:3.9.19
 
 # Set working directory
