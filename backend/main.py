@@ -50,6 +50,91 @@ app.add_middleware(
 app.include_router(auth.router)
 
 
+@app.on_event("startup")
+async def initialize_users():
+    logger.info("Checking for default Super Admin and Admin users...")
+    conn = sqlite3.connect(settings.DB_PATH)
+    c = conn.cursor()
+
+    # Super Admin
+    super_admin_data = {
+        "username": "superadmin",
+        "email": "superadmin@gmail.com",
+        "password": "superadmin",
+        "role": "super_admin",
+    }
+
+    # Check if Super Admin exists
+    c.execute(
+        "SELECT id FROM users WHERE username = ?", (super_admin_data["username"],)
+    )
+    if not c.fetchone():
+        user_id = str(uuid.uuid4())
+        hashed_password = pwd_context.hash(super_admin_data["password"])
+        created_at = datetime.utcnow().isoformat()
+        try:
+            c.execute(
+                """
+                INSERT INTO users (id, username, email, password, role, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    user_id,
+                    super_admin_data["username"],
+                    super_admin_data["email"],
+                    hashed_password,
+                    super_admin_data["role"],
+                    created_at,
+                ),
+            )
+            conn.commit()
+            logger.info(f"Created Super Admin user: {super_admin_data['username']}")
+        except sqlite3.IntegrityError as e:
+            conn.rollback()
+            logger.error(f"Failed to create Super Admin: {str(e)}")
+    else:
+        logger.info(f"Super Admin user {super_admin_data['username']} already exists")
+
+    # Admin
+    admin_data = {
+        "username": "admin",
+        "email": "admin@gmail.com",
+        "password": "admin",
+        "role": "admin",
+    }
+
+    # Check if Admin exists
+    c.execute("SELECT id FROM users WHERE username = ?", (admin_data["username"],))
+    if not c.fetchone():
+        user_id = str(uuid.uuid4())
+        hashed_password = pwd_context.hash(admin_data["password"])
+        created_at = datetime.utcnow().isoformat()
+        try:
+            c.execute(
+                """
+                INSERT INTO users (id, username, email, password, role, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    user_id,
+                    admin_data["username"],
+                    admin_data["email"],
+                    hashed_password,
+                    admin_data["role"],
+                    created_at,
+                ),
+            )
+            conn.commit()
+            logger.info(f"Created Admin user: {admin_data['username']}")
+        except sqlite3.IntegrityError as e:
+            conn.rollback()
+            logger.error(f"Failed to create Admin: {str(e)}")
+    else:
+        logger.info(f"Admin user {admin_data['username']} already exists")
+
+    conn.close()
+
+
 @app.post("/api/hospitals", response_model=HospitalResponse)
 async def create_hospital(
     hospital: HospitalCreate, current_user: dict = Depends(get_current_user)

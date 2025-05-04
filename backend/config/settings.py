@@ -13,7 +13,7 @@ class Settings:
     JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
     ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 60))
     PUBLIC_API_URL = os.getenv(
-        "PUBLIC_API_URL", "https://e6ca-34-125-166-140.ngrok-free.app/generate"
+        "PUBLIC_API_URL", "https://6af3-34-169-149-75.ngrok-free.app/generate"
     )
     ALLOWED_ORIGINS = ["http://localhost:3000"]
     GOOGLE_API_KEY = os.getenv(
