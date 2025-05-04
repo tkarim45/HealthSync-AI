@@ -541,6 +541,9 @@ async def debug_version(current_user: dict = Depends(get_current_user)):
 #         raise HTTPException(status_code=500, detail=f"Error processing query: {str(e)}")
 
 
+client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+
+
 @app.post("/api/medical-query")
 async def medical_query(
     query: Optional[str] = Form(None),
@@ -622,7 +625,6 @@ async def medical_query(
 
         logger.info(f"Sending prompt to Groq API: {prompt[:100]}...")
         # Call Groq API
-        client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
         chat_completion = client.chat.completions.create(
             messages=[
                 {
@@ -694,6 +696,7 @@ async def acne_analysis(
         image_url = f"data:{image.content_type};base64,{base64_image}"
         response = await analyze_acne_image(image_url, current_user["user_id"])
         logger.info("Acne image analysis completed successfully")
+        await asyncio.sleep(10)  # Add 10-second delay before returning response
         return {"response": response}
     except Exception as e:
         logger.error(f"Error processing acne image: {str(e)}")

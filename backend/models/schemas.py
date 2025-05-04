@@ -176,3 +176,7 @@ class AdminCreate(BaseModel):
 
 class GeneralQueryRequest(BaseModel):
     query: str
+
+
+class AcneQueryRequest(BaseModel):
+    query: Optional[str] = None
