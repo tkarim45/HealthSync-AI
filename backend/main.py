@@ -13,6 +13,7 @@ from fastapi import (
     Request,
     BackgroundTasks,
 )
+import asyncio
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
 import sqlite3
@@ -462,9 +463,9 @@ async def debug_version(current_user: dict = Depends(get_current_user)):
 #         prompt = f"""
 # You are a friendly medical AI assistant who explains blood test results and answers medical questions in simple, kind words for non-experts. Follow these guidelines:
 # 1. Keep answers 100-150 words, clear, and focused.
-# 2. Use analogies (e.g., “Red blood cells are like trucks carrying oxygen”) and avoid jargon.
-# 3. Suggest 1-2 next steps (e.g., “Talk to your doctor about iron supplements”).
-# 4. Highlight urgency (e.g., “If you feel dizzy, go now”).
+# 2. Use analogies (e.g., "Red blood cells are like trucks carrying oxygen") and avoid jargon.
+# 3. Suggest 1-2 next steps (e.g., "Talk to your doctor about iron supplements").
+# 4. Highlight urgency (e.g., "If you feel dizzy, go now").
 # 5. Note this is not a diagnosis and recommend consulting a doctor.
 # 6. Output only the answer text, without labels like "assistant:" or code blocks.
 
@@ -541,9 +542,6 @@ async def debug_version(current_user: dict = Depends(get_current_user)):
 #         raise HTTPException(status_code=500, detail=f"Error processing query: {str(e)}")
 
 
-client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
-
-
 @app.post("/api/medical-query")
 async def medical_query(
     query: Optional[str] = Form(None),
@@ -568,7 +566,24 @@ async def medical_query(
             with open(file_path, "wb") as f:
                 f.write(await file.read())
             report_text = await parse_blood_report(file_path)
-            json_output, _ = await structure_report(report_text)
+
+            # Enhanced JSON parsing with error handling
+            try:
+                json_output, raw_json = await structure_report(report_text)
+                logger.info(
+                    f"Raw JSON from structure_report: {raw_json[:200]}..."
+                )  # Log raw JSON for debugging
+                # Validate JSON structure
+                if not isinstance(json_output, dict):
+                    logger.error("structure_report returned invalid JSON structure")
+                    json_output = None  # Fallback to None if JSON is invalid
+            except json.JSONDecodeError as json_err:
+                logger.error(f"JSON parsing error in structure_report: {str(json_err)}")
+                json_output = None  # Fallback to None if JSON parsing fails
+            except Exception as e:
+                logger.error(f"Error in structure_report: {str(e)}")
+                json_output = None  # Fallback to None for other errors
+
             os.remove(file_path)
             logger.info(f"File processed and deleted: {file_path}")
 
@@ -598,13 +613,21 @@ async def medical_query(
             logger.info(f"Effective query for follow-up: {effective_query}")
 
         prompt = f"""
-            You are a friendly medical AI assistant who explains blood test results and answers medical questions in simple, kind words for non-experts. Follow these guidelines:
+            You are a friendly medical AI assistant who analyzes Complete Blood Count (CBC) results and answers medical questions in simple, kind words for non-experts. Follow these guidelines:
             1. Keep answers 100-150 words, clear, and focused.
-            2. Use analogies (e.g., “Red blood cells are like trucks carrying oxygen”) and avoid jargon.
-            3. Suggest 1-2 next steps (e.g., “Talk to your doctor about iron supplements”).
-            4. Highlight urgency (e.g., “If you feel dizzy, go now”).
-            5. Note this is not a diagnosis and recommend consulting a doctor.
-            6. Output only the answer text, without labels like "assistant:" or code blocks.
+            2. Use analogies (e.g., "Red blood cells are like delivery trucks carrying oxygen").
+            3. Avoid medical jargon; explain terms simply.
+            4. Suggest 1-2 next steps (e.g., "Discuss with your doctor about possible iron supplements").
+            5. Highlight urgency (e.g., "If you feel very weak or dizzy, see a doctor right away").
+            6. Emphasize this is not a diagnosis and recommend consulting a doctor.
+            7. Output only the answer text, without labels like "assistant:" or code blocks.
+
+            For CBC analysis, focus on:
+            - Red blood cell count (RBC), hemoglobin, hematocrit (normal ranges: males 4.5-6.1 million/mcL, 13-17 g/dL, 40-55%; females 4.0-5.4 million/mcL, 11.5-15.5 g/dL, 36-48%).
+            - White blood cell count (WBC, normal 4,000-10,000/mcL) and differential (e.g., neutrophils, lymphocytes).
+            - Platelet count (normal 150,000-400,000/mcL).
+            - If available, mean corpuscular volume (MCV, normal 80-100 fL), mean corpuscular hemoglobin (MCH, normal 27-31 pg), and red cell distribution width (RDW, normal 12-15%).
+            - Compare results to normal ranges, explain abnormalities, and suggest possible causes (e.g., anemia, infection).
 
             Current Query: {effective_query}
         """
@@ -625,6 +648,7 @@ async def medical_query(
 
         logger.info(f"Sending prompt to Groq API: {prompt[:100]}...")
         # Call Groq API
+        client = Groq(api_key=settings.GROQ_API_KEY)
         chat_completion = client.chat.completions.create(
             messages=[
                 {
@@ -632,7 +656,7 @@ async def medical_query(
                     "content": prompt,
                 }
             ],
-            model="llama-3.3-70b-versatile",  # Use the same model as in the example
+            model="llama-3.3-70b-versatile",
             stream=False,
         )
 
@@ -644,7 +668,7 @@ async def medical_query(
                 status_code=500, detail="No content in Groq API response"
             )
 
-        # Clean the response as before
+        # Clean the response
         cleaned_response = raw_response.strip()
         cleaned_response = re.sub(
             r"^(assistant:|[\[\{]?(ANSWER|RESPONSE)[\]\}]?:?\s*)",
@@ -671,6 +695,7 @@ async def medical_query(
         )
 
         logger.info("Query processed successfully")
+        await asyncio.sleep(5)  # Add 10-second delay before returning response
         return {"structured_report": json_output, "response": response}
     except Exception as e:
         logger.error(f"Error processing query: {str(e)}")
@@ -696,7 +721,7 @@ async def acne_analysis(
         image_url = f"data:{image.content_type};base64,{base64_image}"
         response = await analyze_acne_image(image_url, current_user["user_id"])
         logger.info("Acne image analysis completed successfully")
-        await asyncio.sleep(10)  # Add 10-second delay before returning response
+        await asyncio.sleep(15)  # Add 10-second delay before returning response
         return {"response": response}
     except Exception as e:
         logger.error(f"Error processing acne image: {str(e)}")

@@ -12,9 +12,6 @@ class Settings:
     JWT_SECRET = os.getenv("JWT_SECRET", "your-secret-key")
     JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
     ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 60))
-    PUBLIC_API_URL = os.getenv(
-        "PUBLIC_API_URL", "https://6af3-34-169-149-75.ngrok-free.app/generate"
-    )
     ALLOWED_ORIGINS = ["http://localhost:3000"]
     GOOGLE_API_KEY = os.getenv(
         "GOOGLE_API_KEY", "AIzaSyAbF61cmhhOth0uo0esgsrY5edTGykCdAw"
@@ -28,6 +25,7 @@ class Settings:
     EMAIL_PASSWORD: str = os.getenv("EMAIL_PASSWORD")
     SMTP_SERVER: str = os.getenv("SMTP_SERVER", "smtp.gmail.com")
     SMTP_PORT: int = os.getenv("SMTP_PORT", 587)
+    GROQ_API_KEY: str = os.getenv("GROQ_API_KEY")
 
 
 settings = Settings()

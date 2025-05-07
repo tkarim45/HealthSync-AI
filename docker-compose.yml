@@ -9,8 +9,7 @@ services:
       - ./backend/.env
     environment:
       - PYTHONUNBUFFERED=1
-      - PUBLIC_API_URL=https://4057-34-169-149-75.ngrok-free.app/generate # Update later
-      - ALLOWED_ORIGINS=http://localhost:3000,https://*.ngrok-free.app,https://a0ad-110-93-234-12.ngrok-free.app
+      - ALLOWED_ORIGINS=http://localhost:3000
       - DB_PATH=/app/healthsync.db
     volumes:
       - db_data:/app

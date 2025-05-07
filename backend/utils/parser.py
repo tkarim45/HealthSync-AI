@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 from fastapi import HTTPException
 from datetime import datetime, timedelta
 from collections import defaultdict
+from config.settings import settings
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -17,10 +18,9 @@ load_dotenv()
 
 # Initialize LlamaParse and Groq
 LLAMA_PARSER_API_KEY = os.getenv("LLAMA_PARSER_API_KEY")
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 parser = LlamaParse(api_key=LLAMA_PARSER_API_KEY, result_type="markdown")
-client = Groq(api_key=GROQ_API_KEY)
+client = Groq(api_key=settings.GROQ_API_KEY)
 
 # In-memory conversation history: {user_id: [{"query": str, "report_json": str, "response": str, "timestamp": datetime}, ...]}
 conversation_history = defaultdict(list)
