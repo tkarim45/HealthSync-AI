@@ -721,7 +721,7 @@ async def acne_analysis(
         image_url = f"data:{image.content_type};base64,{base64_image}"
         response = await analyze_acne_image(image_url, current_user["user_id"])
         logger.info("Acne image analysis completed successfully")
-        await asyncio.sleep(15)  # Add 10-second delay before returning response
+        await asyncio.sleep(5)  # Add 10-second delay before returning response
         return {"response": response}
     except Exception as e:
         logger.error(f"Error processing acne image: {str(e)}")

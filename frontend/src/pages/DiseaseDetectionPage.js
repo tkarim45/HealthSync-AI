@@ -45,7 +45,7 @@ const DiseaseDetectionPage = () => {
     }
 
     try {
-      const { data } = await axios.post("http://localhost:8000/api/acne-analysis", formData, {
+      const { data } = await axios.post(`${process.env.REACT_APP_API_URL}/api/acne-analysis`, formData, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
           "Content-Type": "multipart/form-data",
