@@ -4,9 +4,9 @@ from jose import jwt, JWTError
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
 import logging
-from models.schemas import UserCreate, Token, LoginRequest, UserResponse
-from utils.db import get_user, get_db_connection
+import psycopg2
 from config.settings import settings
+from models.schemas import UserCreate, Token, LoginRequest, UserResponse
 import uuid
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -53,10 +53,16 @@ def require_role(role: str):
 async def signup(user: UserCreate):
     """Register a new user."""
     logger.info(f"Attempting signup for username: {user.username}")
-    conn = get_db_connection()
+    conn = psycopg2.connect(
+        dbname=settings.DB_NAME,
+        user=settings.DB_USER,
+        password=settings.DB_PASSWORD,
+        host=settings.DB_HOST,
+        port=settings.DB_PORT,
+    )
     c = conn.cursor()
     c.execute(
-        "SELECT username, email FROM users WHERE username = ? OR email = ?",
+        "SELECT username, email FROM users WHERE username = %s OR email = %s",
         (user.username, user.email),
     )
     if c.fetchone():
@@ -65,13 +71,22 @@ async def signup(user: UserCreate):
 
     hashed_password = pwd_context.hash(user.password)
     user_id = str(uuid.uuid4())
-    created_at = datetime.utcnow().isoformat()
+    created_at = datetime.utcnow()  # Use TIMESTAMP directly
     role = "user"  # Restrict to 'user' role
-    c.execute(
-        "INSERT INTO users (id, username, email, password, role, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-        (user_id, user.username, user.email, hashed_password, role, created_at),
-    )
-    conn.commit()
+    try:
+        c.execute(
+            """
+            INSERT INTO users (id, username, email, password, role, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            """,
+            (user_id, user.username, user.email, hashed_password, role, created_at),
+        )
+        conn.commit()
+    except psycopg2.IntegrityError:
+        conn.rollback()
+        conn.close()
+        raise HTTPException(status_code=400, detail="Error creating user")
+
     conn.close()
 
     access_token = create_access_token(
@@ -89,25 +104,36 @@ async def signup(user: UserCreate):
 
 @router.post("/login", response_model=Token)
 async def login(login_data: LoginRequest):
-    conn = get_db_connection()
+    """Authenticate a user and return a JWT token."""
+    conn = psycopg2.connect(
+        dbname=settings.DB_NAME,
+        user=settings.DB_USER,
+        password=settings.DB_PASSWORD,
+        host=settings.DB_HOST,
+        port=settings.DB_PORT,
+    )
     c = conn.cursor()
-    user = await get_user(login_data.username)
-    if not user:
-        conn.close()
+    c.execute(
+        "SELECT id, username, email, password, role FROM users WHERE username = %s",
+        (login_data.username,),
+    )
+    user = c.fetchone()
+    conn.close()
+
+    if not user or not pwd_context.verify(
+        login_data.password, user[3]
+    ):  # user[3] is password
         raise HTTPException(status_code=400, detail="Incorrect username or password")
-    if not pwd_context.verify(login_data.password, user.hashed_password):
-        conn.close()
-        raise HTTPException(status_code=400, detail="Incorrect username or password")
+
+    user_id, username, email, _, role = user
     access_token = create_access_token(
-        data={"sub": user.id, "role": user.role},
+        data={"sub": user_id, "role": role},
         expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
     )
-    logger.info(f"User logged in: {user.username}, role: {user.role}")
+    logger.info(f"User logged in: {username}, role: {role}")
     response = {
         "token": access_token,
-        "user": UserResponse(
-            id=user.id, username=user.username, email=user.email, role=user.role
-        ),
+        "user": UserResponse(id=user_id, username=username, email=email, role=role),
     }
     conn.close()
     logger.debug(f"Login response: {response}")

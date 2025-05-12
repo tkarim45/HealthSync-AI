@@ -16,7 +16,7 @@ from fastapi import (
 import asyncio
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
-import sqlite3
+import psycopg2
 from models.schemas import *
 import uuid
 from datetime import datetime, timedelta, date
@@ -30,12 +30,14 @@ from routes import auth
 from utils.pineconeutils import *
 from utils.email import *
 from utils.agents import *
+from utils.populate_dummy_data import populate_dummy_data
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 init_db()
+populate_dummy_data()
 
 app = FastAPI()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
@@ -54,7 +56,13 @@ app.include_router(auth.router)
 @app.on_event("startup")
 async def initialize_users():
     logger.info("Checking for default Super Admin and Admin users...")
-    conn = sqlite3.connect(settings.DB_PATH)
+    conn = psycopg2.connect(
+        dbname=settings.DB_NAME,
+        user=settings.DB_USER,
+        password=settings.DB_PASSWORD,
+        host=settings.DB_HOST,
+        port=settings.DB_PORT,
+    )
     c = conn.cursor()
 
     # Super Admin
@@ -67,17 +75,17 @@ async def initialize_users():
 
     # Check if Super Admin exists
     c.execute(
-        "SELECT id FROM users WHERE username = ?", (super_admin_data["username"],)
+        "SELECT id FROM users WHERE username = %s", (super_admin_data["username"],)
     )
     if not c.fetchone():
         user_id = str(uuid.uuid4())
         hashed_password = pwd_context.hash(super_admin_data["password"])
-        created_at = datetime.utcnow().isoformat()
+        created_at = datetime.utcnow()
         try:
             c.execute(
                 """
                 INSERT INTO users (id, username, email, password, role, created_at)
-                VALUES (?, ?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 """,
                 (
                     user_id,
@@ -90,7 +98,7 @@ async def initialize_users():
             )
             conn.commit()
             logger.info(f"Created Super Admin user: {super_admin_data['username']}")
-        except sqlite3.IntegrityError as e:
+        except psycopg2.IntegrityError as e:
             conn.rollback()
             logger.error(f"Failed to create Super Admin: {str(e)}")
     else:
@@ -105,16 +113,16 @@ async def initialize_users():
     }
 
     # Check if Admin exists
-    c.execute("SELECT id FROM users WHERE username = ?", (admin_data["username"],))
+    c.execute("SELECT id FROM users WHERE username = %s", (admin_data["username"],))
     if not c.fetchone():
         user_id = str(uuid.uuid4())
         hashed_password = pwd_context.hash(admin_data["password"])
-        created_at = datetime.utcnow().isoformat()
+        created_at = datetime.utcnow()
         try:
             c.execute(
                 """
                 INSERT INTO users (id, username, email, password, role, created_at)
-                VALUES (?, ?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 """,
                 (
                     user_id,
@@ -127,7 +135,7 @@ async def initialize_users():
             )
             conn.commit()
             logger.info(f"Created Admin user: {admin_data['username']}")
-        except sqlite3.IntegrityError as e:
+        except psycopg2.IntegrityError as e:
             conn.rollback()
             logger.error(f"Failed to create Admin: {str(e)}")
     else:
@@ -142,11 +150,17 @@ async def create_hospital(
 ):
     if current_user["role"] != "super_admin":
         raise HTTPException(status_code=403, detail="Not authorized")
-    conn = sqlite3.connect(settings.DB_PATH)
+    conn = psycopg2.connect(
+        dbname=settings.DB_NAME,
+        user=settings.DB_USER,
+        password=settings.DB_PASSWORD,
+        host=settings.DB_HOST,
+        port=settings.DB_PORT,
+    )
     c = conn.cursor()
     hospital_id = str(uuid.uuid4())
     c.execute(
-        "INSERT INTO hospitals (id, name, address, lat, lng) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO hospitals (id, name, address, lat, lng) VALUES (%s, %s, %s, %s, %s)",
         (hospital_id, hospital.name, hospital.address, hospital.lat, hospital.lng),
     )
     conn.commit()
@@ -168,7 +182,13 @@ async def assign_hospital_admin(
     if current_user["role"] != "super_admin":
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    conn = sqlite3.connect(settings.DB_PATH)
+    conn = psycopg2.connect(
+        dbname=settings.DB_NAME,
+        user=settings.DB_USER,
+        password=settings.DB_PASSWORD,
+        host=settings.DB_HOST,
+        port=settings.DB_PORT,
+    )
     c = conn.cursor()
 
     # Check if any admins exist
@@ -181,13 +201,13 @@ async def assign_hospital_admin(
         )
 
     # Verify hospital exists
-    c.execute("SELECT id FROM hospitals WHERE id = ?", (admin_data.hospital_id,))
+    c.execute("SELECT id FROM hospitals WHERE id = %s", (admin_data.hospital_id,))
     if not c.fetchone():
         conn.close()
         raise HTTPException(status_code=404, detail="Hospital not found")
 
     # Verify user exists and has admin role
-    c.execute("SELECT id, role FROM users WHERE username = ?", (admin_data.username,))
+    c.execute("SELECT id, role FROM users WHERE username = %s", (admin_data.username,))
     user = c.fetchone()
     if not user:
         conn.close()
@@ -199,7 +219,7 @@ async def assign_hospital_admin(
 
     # Assign user as hospital admin
     c.execute(
-        "INSERT INTO hospital_admins (hospital_id, user_id) VALUES (?, ?)",
+        "INSERT INTO hospital_admins (hospital_id, user_id) VALUES (%s, %s)",
         (admin_data.hospital_id, user_id),
     )
 
@@ -219,7 +239,13 @@ async def get_admins(current_user: dict = Depends(get_current_user)):
     if current_user["role"] != "super_admin":
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    conn = sqlite3.connect(settings.DB_PATH)
+    conn = psycopg2.connect(
+        dbname=settings.DB_NAME,
+        user=settings.DB_USER,
+        password=settings.DB_PASSWORD,
+        host=settings.DB_HOST,
+        port=settings.DB_PORT,
+    )
     c = conn.cursor()
     c.execute("SELECT id, username, email, role FROM users WHERE role = 'admin'")
     admins = [
@@ -234,7 +260,13 @@ async def get_admins(current_user: dict = Depends(get_current_user)):
 
 @app.get("/api/hospitals", response_model=list[HospitalResponse])
 async def list_hospitals(current_user: dict = Depends(get_current_user)):
-    conn = sqlite3.connect(settings.DB_PATH)
+    conn = psycopg2.connect(
+        dbname=settings.DB_NAME,
+        user=settings.DB_USER,
+        password=settings.DB_PASSWORD,
+        host=settings.DB_HOST,
+        port=settings.DB_PORT,
+    )
     c = conn.cursor()
     c.execute("SELECT id, name, address, lat, lng FROM hospitals")
     hospitals = [
@@ -254,15 +286,21 @@ async def update_hospital(
     hospital: HospitalCreate,
     current_user: dict = Depends(require_role("super_admin")),
 ):
-    conn = sqlite3.connect(settings.DB_PATH)
+    conn = psycopg2.connect(
+        dbname=settings.DB_NAME,
+        user=settings.DB_USER,
+        password=settings.DB_PASSWORD,
+        host=settings.DB_HOST,
+        port=settings.DB_PORT,
+    )
     c = conn.cursor()
-    c.execute("SELECT id FROM hospitals WHERE id = ?", (hospital_id,))
+    c.execute("SELECT id FROM hospitals WHERE id = %s", (hospital_id,))
     if not c.fetchone():
         conn.close()
         raise HTTPException(status_code=404, detail="Hospital not found")
     try:
         c.execute(
-            "UPDATE hospitals SET name = ?, address = ?, lat = ?, lng = ? WHERE id = ?",
+            "UPDATE hospitals SET name = %s, address = %s, lat = %s, lng = %s WHERE id = %s",
             (hospital.name, hospital.address, hospital.lat, hospital.lng, hospital_id),
         )
         conn.commit()
@@ -276,7 +314,7 @@ async def update_hospital(
             lat=hospital.lat,
             lng=hospital.lng,
         )
-    except sqlite3.IntegrityError:
+    except psycopg2.IntegrityError:
         conn.rollback()
         raise HTTPException(status_code=400, detail="Hospital name already exists")
     finally:
@@ -287,13 +325,19 @@ async def update_hospital(
 async def delete_hospital(
     hospital_id: str, current_user: dict = Depends(require_role("super_admin"))
 ):
-    conn = sqlite3.connect(settings.DB_PATH)
+    conn = psycopg2.connect(
+        dbname=settings.DB_NAME,
+        user=settings.DB_USER,
+        password=settings.DB_PASSWORD,
+        host=settings.DB_HOST,
+        port=settings.DB_PORT,
+    )
     c = conn.cursor()
-    c.execute("SELECT id FROM hospitals WHERE id = ?", (hospital_id,))
+    c.execute("SELECT id FROM hospitals WHERE id = %s", (hospital_id,))
     if not c.fetchone():
         conn.close()
         raise HTTPException(status_code=404, detail="Hospital not found")
-    c.execute("DELETE FROM hospitals WHERE id = ?", (hospital_id,))
+    c.execute("DELETE FROM hospitals WHERE id = %s", (hospital_id,))
     conn.commit()
     conn.close()
     logger.info(
@@ -308,15 +352,21 @@ async def assign_hospital_admin(
     assignment: HospitalAdminAssign,
     current_user: dict = Depends(require_role("super_admin")),
 ):
-    conn = sqlite3.connect(settings.DB_PATH)
+    conn = psycopg2.connect(
+        dbname=settings.DB_NAME,
+        user=settings.DB_USER,
+        password=settings.DB_PASSWORD,
+        host=settings.DB_HOST,
+        port=settings.DB_PORT,
+    )
     c = conn.cursor()
     # Verify hospital exists
-    c.execute("SELECT id FROM hospitals WHERE id = ?", (hospital_id,))
+    c.execute("SELECT id FROM hospitals WHERE id = %s", (hospital_id,))
     if not c.fetchone():
         conn.close()
         raise HTTPException(status_code=404, detail="Hospital not found")
     # Verify user exists and is an admin
-    c.execute("SELECT id, role FROM users WHERE id = ?", (assignment.user_id,))
+    c.execute("SELECT id, role FROM users WHERE id = %s", (assignment.user_id,))
     user = c.fetchone()
     if not user:
         conn.close()
@@ -325,10 +375,10 @@ async def assign_hospital_admin(
         conn.close()
         raise HTTPException(status_code=400, detail="User must be an admin")
     # Assign admin to hospital
-    assigned_at = datetime.utcnow().isoformat()
+    assigned_at = datetime.utcnow()
     try:
         c.execute(
-            "INSERT INTO hospital_admins (hospital_id, user_id, assigned_at) VALUES (?, ?, ?)",
+            "INSERT INTO hospital_admins (hospital_id, user_id, assigned_at) VALUES (%s, %s, %s)",
             (hospital_id, assignment.user_id, assigned_at),
         )
         conn.commit()
@@ -336,7 +386,7 @@ async def assign_hospital_admin(
             f"Admin {assignment.user_id} assigned to hospital {hospital_id} by super_admin: {current_user['user_id']}"
         )
         return {"detail": "Admin assigned to hospital"}
-    except sqlite3.IntegrityError:
+    except psycopg2.IntegrityError:
         conn.rollback()
         raise HTTPException(
             status_code=400, detail="Admin already assigned to this hospital"
@@ -405,141 +455,6 @@ async def debug_version(current_user: dict = Depends(get_current_user)):
     """Return the version of the running main.py to verify correct code."""
     logger.info(f"Debug version requested by user: {current_user['user_id']}")
     return {"version": "7a8c3e9d-2b1f-4e7c-9f2a-5c3d8e6f9012", "file": "main.py"}
-
-
-# @app.post("/api/medical-query")
-# async def medical_query(
-#     query: Optional[str] = Form(None),
-#     file: Optional[UploadFile] = File(None),
-#     current_user: dict = Depends(get_current_user),
-#     request: Request = None,
-# ):
-#     """Process blood report and/or answer query using public API."""
-#     try:
-#         form_data = await request.form()
-#         logger.info(
-#             f"Received medical query for user: {current_user['user_id']}, raw_query: {query!r}, file: {file.filename if file else None}, form_data: {dict(form_data)}"
-#         )
-
-#         json_output = None
-#         response = None
-
-#         if file:
-#             file_path = f"uploads/{current_user['user_id']}_{file.filename}"
-#             logger.info(f"Saving file: {file_path}")
-#             os.makedirs("uploads", exist_ok=True)
-#             with open(file_path, "wb") as f:
-#                 f.write(await file.read())
-#             report_text = await parse_blood_report(file_path)
-#             json_output, _ = await structure_report(report_text)
-#             os.remove(file_path)
-#             logger.info(f"File processed and deleted: {file_path}")
-
-#             effective_query = (
-#                 query.strip() if query else "Explain my blood test results"
-#             )
-#             logger.info(f"Effective query for file upload: {effective_query}")
-#         else:
-#             if query is None or query.strip() == "":
-#                 logger.error("No query provided for follow-up question")
-#                 raise HTTPException(
-#                     status_code=400,
-#                     detail="A non-empty query is required when no file is uploaded.",
-#                 )
-
-#             history = get_chat_history(current_user["user_id"])
-#             if history and any(h["report_json"] for h in history):
-#                 logger.info(
-#                     f"Retrieving stored report for user: {current_user['user_id']}"
-#                 )
-#                 json_output = json.loads(history[-1]["report_json"])
-#             else:
-#                 logger.info("No stored report, proceeding with query only")
-#                 json_output = None
-
-#             effective_query = query.strip()
-#             logger.info(f"Effective query for follow-up: {effective_query}")
-
-#         prompt = f"""
-# You are a friendly medical AI assistant who explains blood test results and answers medical questions in simple, kind words for non-experts. Follow these guidelines:
-# 1. Keep answers 100-150 words, clear, and focused.
-# 2. Use analogies (e.g., "Red blood cells are like trucks carrying oxygen") and avoid jargon.
-# 3. Suggest 1-2 next steps (e.g., "Talk to your doctor about iron supplements").
-# 4. Highlight urgency (e.g., "If you feel dizzy, go now").
-# 5. Note this is not a diagnosis and recommend consulting a doctor.
-# 6. Output only the answer text, without labels like "assistant:" or code blocks.
-
-# Current Query: {effective_query}
-# """
-#         if json_output:
-#             patient_age = json_output.get("patient_info", {}).get("age", "Unknown")
-#             patient_gender = json_output.get("patient_info", {}).get(
-#                 "gender", "Unknown"
-#             )
-#             prompt += f"""
-# Patient Age: {patient_age}
-# Patient Gender: {patient_gender}
-# Blood Test Results (JSON):
-# {json.dumps(json_output, indent=2)}
-# """
-#         else:
-#             prompt += "\nNo blood test results available."
-
-#         logger.info(f"Sending prompt to public API: {prompt[:100]}...")
-#         api_response = requests.post(
-#             settings.PUBLIC_API_URL, json={"prompt": prompt, "max_new_tokens": 300}
-#         )
-#         api_response.raise_for_status()
-#         response_data = api_response.json()
-
-#         if "error" in response_data:
-#             logger.error(f"Public API error: {response_data['error']}")
-#             raise HTTPException(
-#                 status_code=500, detail=f"Public API error: {response_data['error']}"
-#             )
-
-#         raw_response = response_data.get("generated_text")
-#         if not raw_response:
-#             logger.error("No generated_text in public API response")
-#             raise HTTPException(
-#                 status_code=500, detail="No generated_text in public API response"
-#             )
-
-#         cleaned_response = raw_response.strip()
-#         cleaned_response = re.sub(
-#             r"^(assistant:|[\[\{]?(ANSWER|RESPONSE)[\]\}]?:?\s*)",
-#             "",
-#             cleaned_response,
-#             flags=re.IGNORECASE,
-#         )
-#         cleaned_response = re.sub(
-#             r"```(?:json)?\s*(.*?)\s*```", r"\1", cleaned_response, flags=re.DOTALL
-#         )
-#         cleaned_response = re.sub(r"\s*(</s>|[EOT]|\[.*?\])$", "", cleaned_response)
-#         if not cleaned_response.strip():
-#             logger.error("Cleaned response is empty")
-#             raise HTTPException(status_code=500, detail="Cleaned response is empty")
-
-#         response = cleaned_response.strip()
-#         logger.info(f"Parsed public API response: {response[:100]}...")
-
-#         store_chat_history(
-#             user_id=current_user["user_id"],
-#             query=effective_query,
-#             report_json=json.dumps(json_output) if json_output else "",
-#             response=response,
-#         )
-
-#         logger.info("Query processed successfully")
-#         return {"structured_report": json_output, "response": response}
-#     except requests.RequestException as e:
-#         logger.error(f"Public API request failed: {str(e)}")
-#         raise HTTPException(
-#             status_code=500, detail=f"Public API request failed: {str(e)}"
-#         )
-#     except Exception as e:
-#         logger.error(f"Error processing query: {str(e)}")
-#         raise HTTPException(status_code=500, detail=f"Error processing query: {str(e)}")
 
 
 @app.post("/api/medical-query")
@@ -745,10 +660,16 @@ async def get_admin_hospital(current_user: dict = Depends(get_current_user)):
 
     logger.info(f"Current user: {current_user}")
 
-    conn = sqlite3.connect(settings.DB_PATH)
+    conn = psycopg2.connect(
+        dbname=settings.DB_NAME,
+        user=settings.DB_USER,
+        password=settings.DB_PASSWORD,
+        host=settings.DB_HOST,
+        port=settings.DB_PORT,
+    )
     c = conn.cursor()
     c.execute(
-        "SELECT h.id, h.name, h.address, h.lat, h.lng FROM hospitals h JOIN hospital_admins ha ON h.id = ha.hospital_id WHERE ha.user_id = ?",
+        "SELECT h.id, h.name, h.address, h.lat, h.lng FROM hospitals h JOIN hospital_admins ha ON h.id = ha.hospital_id WHERE ha.user_id = %s",
         (current_user["user_id"],),
     )
     hospital = c.fetchone()
@@ -773,11 +694,17 @@ async def create_department(
     if current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    conn = sqlite3.connect(settings.DB_PATH)
+    conn = psycopg2.connect(
+        dbname=settings.DB_NAME,
+        user=settings.DB_USER,
+        password=settings.DB_PASSWORD,
+        host=settings.DB_HOST,
+        port=settings.DB_PORT,
+    )
     c = conn.cursor()
 
     c.execute(
-        "SELECT hospital_id FROM hospital_admins WHERE user_id = ?",
+        "SELECT hospital_id FROM hospital_admins WHERE user_id = %s",
         (current_user["user_id"],),
     )
     hospital_id = c.fetchone()
@@ -788,7 +715,7 @@ async def create_department(
 
     department_id = str(uuid.uuid4())
     c.execute(
-        "INSERT INTO departments (id, hospital_id, name) VALUES (?, ?, ?)",
+        "INSERT INTO departments (id, hospital_id, name) VALUES (%s, %s, %s)",
         (department_id, hospital_id, department.name),
     )
 
@@ -812,12 +739,18 @@ async def assign_doctor(
         f"Assigning doctor: username={doctor.username}, department_id={doctor.department_id}, email={doctor.email}"
     )
 
-    conn = sqlite3.connect(settings.DB_PATH)
+    conn = psycopg2.connect(
+        dbname=settings.DB_NAME,
+        user=settings.DB_USER,
+        password=settings.DB_PASSWORD,
+        host=settings.DB_HOST,
+        port=settings.DB_PORT,
+    )
     c = conn.cursor()
 
     # Get admin's hospital
     c.execute(
-        "SELECT hospital_id FROM hospital_admins WHERE user_id = ?",
+        "SELECT hospital_id FROM hospital_admins WHERE user_id = %s",
         (current_user["user_id"],),
     )
     hospital_id = c.fetchone()
@@ -830,7 +763,7 @@ async def assign_doctor(
 
     # Verify department belongs to admin's hospital
     c.execute(
-        "SELECT id FROM departments WHERE id = ? AND hospital_id = ?",
+        "SELECT id FROM departments WHERE id = %s AND hospital_id = %s",
         (doctor.department_id, hospital_id),
     )
     department = c.fetchone()
@@ -844,23 +777,23 @@ async def assign_doctor(
         )
 
     # Check if user exists
-    c.execute("SELECT id, role FROM users WHERE username = ?", (doctor.username,))
+    c.execute("SELECT id, role FROM users WHERE username = %s", (doctor.username,))
     user = c.fetchone()
     if user:
         user_id, user_role = user
         logger.info(f"Found existing user: id={user_id}, role={user_role}")
         if user_role != "doctor":
-            c.execute("UPDATE users SET role = 'doctor' WHERE id = ?", (user_id,))
+            c.execute("UPDATE users SET role = 'doctor' WHERE id = %s", (user_id,))
     else:
         # Create new user
         user_id = str(uuid.uuid4())
         hashed_password = pwd_context.hash(doctor.password)
-        created_at = datetime.utcnow().isoformat()
+        created_at = datetime.utcnow()
         try:
             c.execute(
                 """
                 INSERT INTO users (id, username, email, password, role, created_at)
-                VALUES (?, ?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 """,
                 (
                     user_id,
@@ -872,7 +805,7 @@ async def assign_doctor(
                 ),
             )
             logger.info(f"Created new user: id={user_id}, username={doctor.username}")
-        except sqlite3.IntegrityError as e:
+        except psycopg2.IntegrityError as e:
             conn.close()
             logger.error(f"User creation failed: {str(e)}")
             raise HTTPException(
@@ -881,7 +814,7 @@ async def assign_doctor(
 
     # Check if doctor is already assigned to this department
     c.execute(
-        "SELECT user_id FROM doctors WHERE user_id = ? AND department_id = ?",
+        "SELECT user_id FROM doctors WHERE user_id = %s AND department_id = %s",
         (user_id, doctor.department_id),
     )
     if c.fetchone():
@@ -897,7 +830,7 @@ async def assign_doctor(
     c.execute(
         """
         INSERT INTO doctors (user_id, department_id, specialty, title, phone, bio)
-        VALUES (?, ?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s, %s)
         """,
         (
             user_id,
@@ -937,7 +870,7 @@ async def assign_doctor(
             c.execute(
                 """
                 INSERT INTO doctor_availability (id, user_id, day_of_week, start_time, end_time)
-                VALUES (?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s)
                 """,
                 (availability_id, user_id, day, start, end),
             )
@@ -955,7 +888,13 @@ async def assign_doctor(
 async def get_departments(
     hospital_id: Optional[str] = None, current_user: dict = Depends(get_current_user)
 ):
-    conn = sqlite3.connect(settings.DB_PATH)
+    conn = psycopg2.connect(
+        dbname=settings.DB_NAME,
+        user=settings.DB_USER,
+        password=settings.DB_PASSWORD,
+        host=settings.DB_HOST,
+        port=settings.DB_PORT,
+    )
     c = conn.cursor()
     query = """
         SELECT d.id, d.hospital_id, d.name, h.name
@@ -964,7 +903,7 @@ async def get_departments(
     """
     params = []
     if hospital_id:
-        query += " WHERE d.hospital_id = ?"
+        query += " WHERE d.hospital_id = %s"
         params.append(hospital_id)
     c.execute(query, params)
     departments = [
@@ -980,12 +919,17 @@ async def get_departments(
     return departments
 
 
-# Updated endpoint: GET /api/doctors
 @app.get("/api/doctors", response_model=List[DoctorResponse])
 async def get_doctors(
     department_id: Optional[str] = None, current_user: dict = Depends(get_current_user)
 ):
-    conn = sqlite3.connect(settings.DB_PATH)
+    conn = psycopg2.connect(
+        dbname=settings.DB_NAME,
+        user=settings.DB_USER,
+        password=settings.DB_PASSWORD,
+        host=settings.DB_HOST,
+        port=settings.DB_PORT,
+    )
     c = conn.cursor()
     query = """
         SELECT doc.user_id, u.username, u.email, doc.department_id, d.name,
@@ -996,7 +940,7 @@ async def get_doctors(
     """
     params = []
     if department_id:
-        query += " WHERE doc.department_id = ?"
+        query += " WHERE doc.department_id = %s"
         params.append(department_id)
     c.execute(query, params)
     doctors = [
@@ -1026,13 +970,19 @@ async def get_doctors(
 async def get_doctor_availability(
     doctor_id: str, current_user: dict = Depends(get_current_user)
 ):
-    conn = sqlite3.connect(settings.DB_PATH)
+    conn = psycopg2.connect(
+        dbname=settings.DB_NAME,
+        user=settings.DB_USER,
+        password=settings.DB_PASSWORD,
+        host=settings.DB_HOST,
+        port=settings.DB_PORT,
+    )
     c = conn.cursor()
     c.execute(
         """
         SELECT id, user_id, day_of_week, start_time, end_time
         FROM doctor_availability
-        WHERE user_id = ?
+        WHERE user_id = %s
         """,
         (doctor_id,),
     )
@@ -1061,7 +1011,13 @@ async def book_appointment(
     if current_user["role"] not in ["user", "admin"]:
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    conn = sqlite3.connect(settings.DB_PATH)
+    conn = psycopg2.connect(
+        dbname=settings.DB_NAME,
+        user=settings.DB_USER,
+        password=settings.DB_PASSWORD,
+        host=settings.DB_HOST,
+        port=settings.DB_PORT,
+    )
     c = conn.cursor()
 
     # Verify doctor exists and get username
@@ -1069,7 +1025,7 @@ async def book_appointment(
         """
         SELECT u.id, u.username
         FROM users u
-        WHERE u.id = ? AND u.role = 'doctor'
+        WHERE u.id = %s AND u.role = 'doctor'
         """,
         (appointment.doctor_id,),
     )
@@ -1084,7 +1040,7 @@ async def book_appointment(
         """
         SELECT d.id, d.name
         FROM departments d
-        WHERE d.id = ?
+        WHERE d.id = %s
         """,
         (appointment.department_id,),
     )
@@ -1095,7 +1051,7 @@ async def book_appointment(
     department_id, department_name = department
 
     # Verify hospital exists
-    c.execute("SELECT id FROM hospitals WHERE id = ?", (appointment.hospital_id,))
+    c.execute("SELECT id FROM hospitals WHERE id = %s", (appointment.hospital_id,))
     if not c.fetchone():
         conn.close()
         raise HTTPException(status_code=404, detail="Hospital not found")
@@ -1104,7 +1060,7 @@ async def book_appointment(
     c.execute(
         """
         SELECT id FROM doctor_availability
-        WHERE user_id = ? AND day_of_week = ? AND start_time = ? AND end_time = ?
+        WHERE user_id = %s AND day_of_week = %s AND start_time = %s AND end_time = %s
         """,
         (
             appointment.doctor_id,
@@ -1121,7 +1077,7 @@ async def book_appointment(
     c.execute(
         """
         SELECT id FROM appointments
-        WHERE doctor_id = ? AND appointment_date = ? AND start_time = ? AND status != 'cancelled'
+        WHERE doctor_id = %s AND appointment_date = %s AND start_time = %s AND status != 'cancelled'
         """,
         (appointment.doctor_id, appointment.appointment_date, appointment.start_time),
     )
@@ -1131,7 +1087,7 @@ async def book_appointment(
 
     # Fetch patient's username and email
     c.execute(
-        "SELECT username, email FROM users WHERE id = ?",
+        "SELECT username, email FROM users WHERE id = %s",
         (current_user["user_id"],),
     )
     user = c.fetchone()
@@ -1142,13 +1098,13 @@ async def book_appointment(
 
     # Insert appointment
     appointment_id = str(uuid.uuid4())
-    created_at = datetime.utcnow().isoformat()
+    created_at = datetime.utcnow()
     c.execute(
         """
         INSERT INTO appointments (
             id, user_id, doctor_id, department_id, hospital_id, appointment_date, 
             start_time, end_time, status, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """,
         (
             appointment_id,
@@ -1195,7 +1151,7 @@ async def book_appointment(
         start_time=appointment.start_time,
         end_time=appointment.end_time,
         status="scheduled",
-        created_at=created_at,
+        created_at=str(created_at),
         hospital_id=appointment.hospital_id,
     )
 
@@ -1216,12 +1172,18 @@ async def get_doctor_slots(
             status_code=400, detail="Invalid date format. Use YYYY-MM-DD"
         )
 
-    conn = sqlite3.connect(settings.DB_PATH)
+    conn = psycopg2.connect(
+        dbname=settings.DB_NAME,
+        user=settings.DB_USER,
+        password=settings.DB_PASSWORD,
+        host=settings.DB_HOST,
+        port=settings.DB_PORT,
+    )
     c = conn.cursor()
 
     # Verify doctor exists
     c.execute(
-        "SELECT id FROM users WHERE id = ? AND role = 'doctor'",
+        "SELECT id FROM users WHERE id = %s AND role = 'doctor'",
         (doctor_id,),
     )
     if not c.fetchone():
@@ -1233,11 +1195,11 @@ async def get_doctor_slots(
         """
         SELECT da.start_time, da.end_time
         FROM doctor_availability da
-        WHERE da.user_id = ? AND da.day_of_week = ?
+        WHERE da.user_id = %s AND da.day_of_week = %s
         AND NOT EXISTS (
             SELECT 1 FROM appointments a
             WHERE a.doctor_id = da.user_id
-            AND a.appointment_date = ?
+            AND a.appointment_date = %s
             AND a.start_time = da.start_time
             AND a.status != 'cancelled'
         )
@@ -1256,7 +1218,13 @@ async def get_doctor_slots(
 
 @app.get("/api/appointments", response_model=List[AppointmentResponse])
 async def get_appointments(current_user: dict = Depends(get_current_user)):
-    conn = sqlite3.connect(settings.DB_PATH)
+    conn = psycopg2.connect(
+        dbname=settings.DB_NAME,
+        user=settings.DB_USER,
+        password=settings.DB_PASSWORD,
+        host=settings.DB_HOST,
+        port=settings.DB_PORT,
+    )
     c = conn.cursor()
     if current_user["role"] == "admin":
         c.execute(
@@ -1266,7 +1234,7 @@ async def get_appointments(current_user: dict = Depends(get_current_user)):
             JOIN doctors d ON a.doctor_id = d.user_id
             JOIN departments dept ON d.department_id = dept.id
             JOIN hospital_admins ha ON dept.hospital_id = ha.hospital_id
-            WHERE ha.user_id = ?
+            WHERE ha.user_id = %s
             """,
             (current_user["user_id"],),
         )
@@ -1275,7 +1243,7 @@ async def get_appointments(current_user: dict = Depends(get_current_user)):
             """
             SELECT id, user_id, doctor_id, department_id, appointment_date, start_time, end_time, status, created_at
             FROM appointments
-            WHERE user_id = ?
+            WHERE user_id = %s
             """,
             (current_user["user_id"],),
         )
@@ -1289,7 +1257,7 @@ async def get_appointments(current_user: dict = Depends(get_current_user)):
             start_time=row[5],
             end_time=row[6],
             status=row[7],
-            created_at=row[8],
+            created_at=str(row[8]),
         )
         for row in c.fetchall()
     ]
@@ -1307,13 +1275,18 @@ async def get_appointments(current_user: dict = Depends(get_current_user)):
 ##########################################################################################
 
 
-# New endpoints
 @app.get("/api/doctor/department", response_model=DepartmentResponse)
 async def get_doctor_department(current_user: dict = Depends(get_current_user)):
     if current_user["role"] != "doctor":
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    conn = sqlite3.connect(settings.DB_PATH)
+    conn = psycopg2.connect(
+        dbname=settings.DB_NAME,
+        user=settings.DB_USER,
+        password=settings.DB_PASSWORD,
+        host=settings.DB_HOST,
+        port=settings.DB_PORT,
+    )
     c = conn.cursor()
     c.execute(
         """
@@ -1321,7 +1294,7 @@ async def get_doctor_department(current_user: dict = Depends(get_current_user)):
         FROM departments d
         JOIN doctors doc ON d.id = doc.department_id
         JOIN hospitals h ON d.hospital_id = h.id
-        WHERE doc.user_id = ?
+        WHERE doc.user_id = %s
         """,
         (current_user["user_id"],),
     )
@@ -1346,7 +1319,13 @@ async def get_todays_appointments(current_user: dict = Depends(get_current_user)
         raise HTTPException(status_code=403, detail="Not authorized")
 
     today = date.today().isoformat()
-    conn = sqlite3.connect(settings.DB_PATH)
+    conn = psycopg2.connect(
+        dbname=settings.DB_NAME,
+        user=settings.DB_USER,
+        password=settings.DB_PASSWORD,
+        host=settings.DB_HOST,
+        port=settings.DB_PORT,
+    )
     c = conn.cursor()
     c.execute(
         """
@@ -1357,7 +1336,7 @@ async def get_todays_appointments(current_user: dict = Depends(get_current_user)
         JOIN users u ON a.user_id = u.id
         JOIN users du ON a.doctor_id = du.id
         JOIN departments d ON a.department_id = d.id
-        WHERE a.doctor_id = ? AND a.appointment_date = ? AND a.status != 'cancelled'
+        WHERE a.doctor_id = %s AND a.appointment_date = %s AND a.status != 'cancelled'
         ORDER BY a.start_time
         """,
         (current_user["user_id"], today),
@@ -1376,7 +1355,7 @@ async def get_todays_appointments(current_user: dict = Depends(get_current_user)
             start_time=row[9],
             end_time=row[10],
             status=row[11],
-            created_at=row[12],
+            created_at=str(row[12]),
             hospital_id=row[13],
         )
         for row in c.fetchall()
@@ -1399,7 +1378,13 @@ async def get_weekly_appointments(current_user: dict = Depends(get_current_user)
     start_date = start_of_week.isoformat()
     end_date = end_of_week.isoformat()
 
-    conn = sqlite3.connect(settings.settings.DB_PATH)
+    conn = psycopg2.connect(
+        dbname=settings.DB_NAME,
+        user=settings.DB_USER,
+        password=settings.DB_PASSWORD,
+        host=settings.DB_HOST,
+        port=settings.DB_PORT,
+    )
     c = conn.cursor()
     c.execute(
         """
@@ -1410,8 +1395,8 @@ async def get_weekly_appointments(current_user: dict = Depends(get_current_user)
         JOIN users u ON a.user_id = u.id
         JOIN users du ON a.doctor_id = du.id
         JOIN departments d ON a.department_id = d.id
-        WHERE a.doctor_id = ? 
-        AND a.appointment_date BETWEEN ? AND ? 
+        WHERE a.doctor_id = %s 
+        AND a.appointment_date BETWEEN %s AND %s 
         AND a.status != 'cancelled'
         ORDER BY a.appointment_date, a.start_time
         """,
@@ -1431,7 +1416,7 @@ async def get_weekly_appointments(current_user: dict = Depends(get_current_user)
             start_time=row[9],
             end_time=row[10],
             status=row[11],
-            created_at=row[12],
+            created_at=str(row[12]),
             hospital_id=row[13],
         )
         for row in c.fetchall()
@@ -1454,12 +1439,18 @@ async def get_patient_medical_history(
         raise HTTPException(status_code=403, detail="Not authorized")
 
     # Verify doctor has an appointment with this patient
-    conn = sqlite3.connect(settings.DB_PATH)
+    conn = psycopg2.connect(
+        dbname=settings.DB_NAME,
+        user=settings.DB_USER,
+        password=settings.DB_PASSWORD,
+        host=settings.DB_HOST,
+        port=settings.DB_PORT,
+    )
     c = conn.cursor()
     c.execute(
         """
         SELECT id FROM appointments
-        WHERE doctor_id = ? AND user_id = ? AND status != 'cancelled'
+        WHERE doctor_id = %s AND user_id = %s AND status != 'cancelled'
         """,
         (current_user["user_id"], user_id),
     )
@@ -1473,7 +1464,7 @@ async def get_patient_medical_history(
         """
         SELECT id, user_id, conditions, allergies, notes, updated_at, updated_by
         FROM medical_history
-        WHERE user_id = ?
+        WHERE user_id = %s
         ORDER BY updated_at DESC
         """,
         (user_id,),
@@ -1485,7 +1476,7 @@ async def get_patient_medical_history(
             conditions=row[2],
             allergies=row[3],
             notes=row[4],
-            updated_at=row[5],
+            updated_at=str(row[5]),
             updated_by=row[6],
         )
         for row in c.fetchall()
@@ -1506,13 +1497,18 @@ async def get_patient_medical_history(
 ##########################################################################################
 
 
-# Updated endpoint: GET /api/admins
 @app.get("/api/admins", response_model=List[AdminResponse])
 async def get_admins(current_user: dict = Depends(get_current_user)):
     if current_user["role"] != "superadmin":
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    conn = sqlite3.connect(settings.DB_PATH)
+    conn = psycopg2.connect(
+        dbname=settings.DB_NAME,
+        user=settings.DB_USER,
+        password=settings.DB_PASSWORD,
+        host=settings.DB_HOST,
+        port=settings.DB_PORT,
+    )
     c = conn.cursor()
     c.execute(
         """
@@ -1535,13 +1531,18 @@ async def get_admins(current_user: dict = Depends(get_current_user)):
     return admins
 
 
-# New endpoint: GET /api/appointments
 @app.get("/api/appointments", response_model=List[AppointmentResponse])
 async def get_all_appointments(current_user: dict = Depends(get_current_user)):
     if current_user["role"] != "superadmin":
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    conn = sqlite3.connect(settings.DB_PATH)
+    conn = psycopg2.connect(
+        dbname=settings.DB_NAME,
+        user=settings.DB_USER,
+        password=settings.DB_PASSWORD,
+        host=settings.DB_HOST,
+        port=settings.DB_PORT,
+    )
     c = conn.cursor()
     c.execute(
         """
@@ -1568,7 +1569,7 @@ async def get_all_appointments(current_user: dict = Depends(get_current_user)):
             start_time=row[8],
             end_time=row[9],
             status=row[10],
-            created_at=row[11],
+            created_at=str(row[11]),
         )
         for row in c.fetchall()
     ]
@@ -1585,12 +1586,18 @@ async def create_admin(
     if current_user["role"] != "super_admin":
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    conn = sqlite3.connect(settings.DB_PATH)
+    conn = psycopg2.connect(
+        dbname=settings.DB_NAME,
+        user=settings.DB_USER,
+        password=settings.DB_PASSWORD,
+        host=settings.DB_HOST,
+        port=settings.DB_PORT,
+    )
     c = conn.cursor()
 
     # Check if username or email already exists
     c.execute(
-        "SELECT id FROM users WHERE username = ? OR email = ?",
+        "SELECT id FROM users WHERE username = %s OR email = %s",
         (admin.username, admin.email),
     )
     if c.fetchone():
@@ -1599,7 +1606,7 @@ async def create_admin(
 
     # Validate hospital_id if provided
     if admin.hospital_id:
-        c.execute("SELECT id FROM hospitals WHERE id = ?", (admin.hospital_id,))
+        c.execute("SELECT id FROM hospitals WHERE id = %s", (admin.hospital_id,))
         if not c.fetchone():
             conn.close()
             raise HTTPException(status_code=400, detail="Invalid hospital ID")
@@ -1607,14 +1614,14 @@ async def create_admin(
     # Generate user ID and hash password
     user_id = str(uuid.uuid4())
     hashed_password = pwd_context.hash(admin.password)
-    created_at = datetime.utcnow().isoformat()
+    created_at = datetime.utcnow()
 
     # Insert user
     try:
         c.execute(
             """
             INSERT INTO users (id, username, email, password, role, created_at)
-            VALUES (?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s)
             """,
             (
                 user_id,
@@ -1628,17 +1635,17 @@ async def create_admin(
 
         # Assign to hospital if hospital_id is provided
         if admin.hospital_id:
-            assigned_at = datetime.utcnow().isoformat()
+            assigned_at = datetime.utcnow()
             c.execute(
                 """
                 INSERT INTO hospital_admins (hospital_id, user_id, assigned_at)
-                VALUES (?, ?, ?)
+                VALUES (%s, %s, %s)
                 """,
                 (admin.hospital_id, user_id, assigned_at),
             )
 
         conn.commit()
-    except sqlite3.IntegrityError as e:
+    except psycopg2.IntegrityError as e:
         conn.rollback()
         conn.close()
         raise HTTPException(status_code=400, detail=f"Database error: {str(e)}")
@@ -1651,18 +1658,21 @@ async def create_admin(
     return {"message": "Admin created successfully"}
 
 
-from datetime import date, timedelta
-
-
 @app.delete("/api/admins/{admin_id}")
 async def delete_admin(
     admin_id: str, current_user: dict = Depends(require_role("super_admin"))
 ):
-    conn = sqlite3.connect(settings.DB_PATH)
+    conn = psycopg2.connect(
+        dbname=settings.DB_NAME,
+        user=settings.DB_USER,
+        password=settings.DB_PASSWORD,
+        host=settings.DB_HOST,
+        port=settings.DB_PORT,
+    )
     c = conn.cursor()
 
     # Verify user exists and is an admin
-    c.execute("SELECT role FROM users WHERE id = ?", (admin_id,))
+    c.execute("SELECT role FROM users WHERE id = %s", (admin_id,))
     user = c.fetchone()
     if not user:
         conn.close()
@@ -1673,15 +1683,15 @@ async def delete_admin(
 
     try:
         # Delete from hospital_admins
-        c.execute("DELETE FROM hospital_admins WHERE user_id = ?", (admin_id,))
+        c.execute("DELETE FROM hospital_admins WHERE user_id = %s", (admin_id,))
         # Delete from users
-        c.execute("DELETE FROM users WHERE id = ?", (admin_id,))
+        c.execute("DELETE FROM users WHERE id = %s", (admin_id,))
         conn.commit()
         logger.info(
             f"Admin {admin_id} deleted by super_admin {current_user['user_id']}"
         )
         return {"detail": "Admin deleted"}
-    except sqlite3.Error as e:
+    except psycopg2.Error as e:
         conn.rollback()
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
     finally:
@@ -1692,12 +1702,18 @@ async def delete_admin(
 async def delete_doctor(
     doctor_id: str, current_user: dict = Depends(require_role("admin"))
 ):
-    conn = sqlite3.connect(settings.DB_PATH)
+    conn = psycopg2.connect(
+        dbname=settings.DB_NAME,
+        user=settings.DB_USER,
+        password=settings.DB_PASSWORD,
+        host=settings.DB_HOST,
+        port=settings.DB_PORT,
+    )
     c = conn.cursor()
 
     # Get admin's hospital
     c.execute(
-        "SELECT hospital_id FROM hospital_admins WHERE user_id = ?",
+        "SELECT hospital_id FROM hospital_admins WHERE user_id = %s",
         (current_user["user_id"],),
     )
     hospital_id = c.fetchone()
@@ -1712,7 +1728,7 @@ async def delete_doctor(
         SELECT doc.user_id
         FROM doctors doc
         JOIN departments d ON doc.department_id = d.id
-        WHERE doc.user_id = ? AND d.hospital_id = ?
+        WHERE doc.user_id = %s AND d.hospital_id = %s
         """,
         (doctor_id, hospital_id),
     )
@@ -1726,7 +1742,7 @@ async def delete_doctor(
     c.execute(
         """
         SELECT COUNT(*) FROM appointments
-        WHERE doctor_id = ? AND status = 'scheduled'
+        WHERE doctor_id = %s AND status = 'scheduled'
         """,
         (doctor_id,),
     )
@@ -1737,22 +1753,22 @@ async def delete_doctor(
             """
             UPDATE appointments
             SET status = 'cancelled'
-            WHERE doctor_id = ? AND status = 'scheduled'
+            WHERE doctor_id = %s AND status = 'scheduled'
             """,
             (doctor_id,),
         )
 
     try:
         # Delete from doctor_availability
-        c.execute("DELETE FROM doctor_availability WHERE user_id = ?", (doctor_id,))
+        c.execute("DELETE FROM doctor_availability WHERE user_id = %s", (doctor_id,))
         # Delete from doctors
-        c.execute("DELETE FROM doctors WHERE user_id = ?", (doctor_id,))
+        c.execute("DELETE FROM doctors WHERE user_id = %s", (doctor_id,))
         # Delete from users
-        c.execute("DELETE FROM users WHERE id = ?", (doctor_id,))
+        c.execute("DELETE FROM users WHERE id = %s", (doctor_id,))
         conn.commit()
         logger.info(f"Doctor {doctor_id} deleted by admin {current_user['user_id']}")
         return {"detail": "Doctor deleted"}
-    except sqlite3.Error as e:
+    except psycopg2.Error as e:
         conn.rollback()
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
     finally:
@@ -1793,13 +1809,19 @@ async def get_medical_history(current_user: dict = Depends(get_current_user)):
     if not user_id:
         raise HTTPException(status_code=400, detail="Invalid user data")
 
-    conn = sqlite3.connect(settings.DB_PATH)
+    conn = psycopg2.connect(
+        dbname=settings.DB_NAME,
+        user=settings.DB_USER,
+        password=settings.DB_PASSWORD,
+        host=settings.DB_HOST,
+        port=settings.DB_PORT,
+    )
     c = conn.cursor()
     c.execute(
         """
         SELECT id, user_id, conditions, allergies, notes, updated_at, updated_by
         FROM medical_history
-        WHERE user_id = ?
+        WHERE user_id = %s
         """,
         (user_id,),
     )
@@ -1810,7 +1832,7 @@ async def get_medical_history(current_user: dict = Depends(get_current_user)):
             conditions=row[2],
             allergies=row[3],
             notes=row[4],
-            updated_at=row[5],
+            updated_at=str(row[5]),
             updated_by=row[6],
         )
         for row in c.fetchall()
@@ -1829,14 +1851,20 @@ async def create_medical_history(
         raise HTTPException(status_code=400, detail="Invalid user data")
 
     record_id = str(uuid.uuid4())
-    updated_at = datetime.utcnow().isoformat()
+    updated_at = datetime.utcnow()
 
-    conn = sqlite3.connect(settings.DB_PATH)
+    conn = psycopg2.connect(
+        dbname=settings.DB_NAME,
+        user=settings.DB_USER,
+        password=settings.DB_PASSWORD,
+        host=settings.DB_HOST,
+        port=settings.DB_PORT,
+    )
     c = conn.cursor()
     c.execute(
         """
         INSERT INTO medical_history (id, user_id, conditions, allergies, notes, updated_at, updated_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
         """,
         (
             record_id,
@@ -1858,7 +1886,7 @@ async def create_medical_history(
         conditions=medical_history.conditions,
         allergies=medical_history.allergies,
         notes=medical_history.notes,
-        updated_at=updated_at,
+        updated_at=str(updated_at),
         updated_by=user_id,
     )
 

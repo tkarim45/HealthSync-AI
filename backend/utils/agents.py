@@ -1,4 +1,4 @@
-import sqlite3
+import psycopg2
 from typing import List, Dict, Optional
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
@@ -49,8 +49,18 @@ class DatabaseKnowledgeResponse(BaseModel):
     error: Optional[str]
 
 
+def get_db_connection():
+    return psycopg2.connect(
+        dbname=settings.DB_NAME,
+        user=settings.DB_USER,
+        password=settings.DB_PASSWORD,
+        host=settings.DB_HOST,
+        port=settings.DB_PORT,
+    )
+
+
 def get_hospitals() -> List[Dict]:
-    conn = sqlite3.connect(settings.DB_PATH)
+    conn = get_db_connection()
     c = conn.cursor()
     c.execute("SELECT id, name, address, lat, lng FROM hospitals")
     hospitals = [
@@ -64,7 +74,7 @@ def get_hospitals() -> List[Dict]:
 def get_doctors(
     department_id: Optional[str] = None, hospital_id: Optional[str] = None
 ) -> List[Dict]:
-    conn = sqlite3.connect(settings.DB_PATH)
+    conn = get_db_connection()
     c = conn.cursor()
     query = """
         SELECT u.id, u.username, u.email, d.department_id, dep.name, d.specialty, d.title, d.phone, d.bio
@@ -75,10 +85,10 @@ def get_doctors(
     """
     params = []
     if department_id:
-        query += " AND d.department_id = ?"
+        query += " AND d.department_id = %s"
         params.append(department_id)
     if hospital_id:
-        query += " AND dep.hospital_id = ?"
+        query += " AND dep.hospital_id = %s"
         params.append(hospital_id)
     c.execute(query, params)
     doctors = [
@@ -100,17 +110,17 @@ def get_doctors(
 
 
 def get_doctor_availability(doctor_id: str, date: Optional[str] = None) -> List[Dict]:
-    conn = sqlite3.connect(settings.DB_PATH)
+    conn = get_db_connection()
     c = conn.cursor()
     query = """
         SELECT id, day_of_week, start_time, end_time
         FROM doctor_availability
-        WHERE user_id = ?
+        WHERE user_id = %s
     """
     params = [doctor_id]
     if date:
         day_of_week = datetime.strptime(date, "%Y-%m-%d").strftime("%A")
-        query += " AND day_of_week = ?"
+        query += " AND day_of_week = %s"
         params.append(day_of_week)
     c.execute(query, params)
     availability = [
@@ -142,7 +152,7 @@ def get_doctor_availability(doctor_id: str, date: Optional[str] = None) -> List[
         c.execute(
             """
             SELECT id FROM appointments
-            WHERE doctor_id = ? AND appointment_date = ? AND start_time = ? AND status != 'cancelled'
+            WHERE doctor_id = %s AND appointment_date = %s AND start_time = %s AND status != 'cancelled'
             """,
             (doctor_id, slot_date, slot["start_time"]),
         )
@@ -198,7 +208,7 @@ def book_appointment(
             logger.error(f"Invalid type for {param}: {type(value)}, value={value}")
             raise ValueError(f"{param} must be a string")
 
-    conn = sqlite3.connect(settings.DB_PATH)
+    conn = get_db_connection()
     c = conn.cursor()
 
     # Verify doctor exists and get username
@@ -206,7 +216,7 @@ def book_appointment(
         """
         SELECT u.id, u.username
         FROM users u
-        WHERE u.id = ? AND u.role = 'doctor'
+        WHERE u.id = %s AND u.role = 'doctor'
         """,
         (doctor_id,),
     )
@@ -225,7 +235,7 @@ def book_appointment(
         """
         SELECT d.id, d.name
         FROM departments d
-        WHERE d.id = ?
+        WHERE d.id = %s
         """,
         (department_id,),
     )
@@ -240,7 +250,7 @@ def book_appointment(
     department_id, department_name = department
 
     # Verify hospital exists
-    c.execute("SELECT id FROM hospitals WHERE id = ?", (hospital_id,))
+    c.execute("SELECT id FROM hospitals WHERE id = %s", (hospital_id,))
     hospital = c.fetchone()
     logger.debug(f"Hospital query: result={hospital}, type={type(hospital)}")
     if not hospital:
@@ -254,7 +264,7 @@ def book_appointment(
     c.execute(
         """
         SELECT id FROM doctor_availability
-        WHERE user_id = ? AND day_of_week = ? AND start_time = ? AND end_time = ?
+        WHERE user_id = %s AND day_of_week = %s AND start_time = %s AND end_time = %s
         """,
         (
             doctor_id,
@@ -280,7 +290,7 @@ def book_appointment(
     c.execute(
         """
         SELECT id FROM appointments
-        WHERE doctor_id = ? AND appointment_date = ? AND start_time = ? AND status != 'cancelled'
+        WHERE doctor_id = %s AND appointment_date = %s AND start_time = %s AND status != 'cancelled'
         """,
         (doctor_id, appointment_date, start_time),
     )
@@ -292,7 +302,7 @@ def book_appointment(
 
     # Fetch patient's username and email
     c.execute(
-        "SELECT username, email FROM users WHERE id = ?",
+        "SELECT username, email FROM users WHERE id = %s",
         (user_id,),
     )
     user = c.fetchone()
@@ -307,28 +317,35 @@ def book_appointment(
 
     # Insert appointment
     appointment_id = str(uuid.uuid4())
-    created_at = datetime.utcnow().isoformat()
-    c.execute(
-        """
-        INSERT INTO appointments (
-            id, user_id, doctor_id, department_id, hospital_id, appointment_date,
-            start_time, end_time, status, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            appointment_id,
-            user_id,
-            doctor_id,
-            department_id,
-            hospital_id,
-            appointment_date,
-            start_time,
-            end_time,
-            "scheduled",
-            created_at,
-        ),
-    )
-    conn.commit()
+    created_at = datetime.utcnow()  # Use TIMESTAMP directly
+    try:
+        c.execute(
+            """
+            INSERT INTO appointments (
+                id, user_id, doctor_id, department_id, hospital_id, appointment_date,
+                start_time, end_time, status, created_at
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (
+                appointment_id,
+                user_id,
+                doctor_id,
+                department_id,
+                hospital_id,
+                appointment_date,
+                start_time,
+                end_time,
+                "scheduled",
+                created_at,
+            ),
+        )
+        conn.commit()
+    except psycopg2.IntegrityError as e:
+        conn.rollback()
+        logger.error(f"Failed to insert appointment: {str(e)}")
+        conn.close()
+        raise ValueError("Error booking appointment")
+
     conn.close()
 
     # Send confirmation email in the background
@@ -358,7 +375,7 @@ def book_appointment(
         "start_time": start_time,
         "end_time": end_time,
         "status": "scheduled",
-        "created_at": created_at,
+        "created_at": str(created_at),
         "hospital_id": hospital_id,
     }
     logger.info(f"Booking successful: {booking}")
@@ -380,10 +397,10 @@ def rag_query(query: str, user_id: str) -> str:
 
 
 def get_department_id_by_name(department_name: str) -> Optional[str]:
-    conn = sqlite3.connect(settings.DB_PATH)
+    conn = get_db_connection()
     c = conn.cursor()
     c.execute(
-        "SELECT id FROM departments WHERE LOWER(name) = LOWER(?)", (department_name,)
+        "SELECT id FROM departments WHERE LOWER(name) = LOWER(%s)", (department_name,)
     )
     result = c.fetchone()
     conn.close()
@@ -391,7 +408,7 @@ def get_department_id_by_name(department_name: str) -> Optional[str]:
 
 
 def get_all_department_names() -> List[str]:
-    conn = sqlite3.connect(settings.DB_PATH)
+    conn = get_db_connection()
     c = conn.cursor()
     c.execute("SELECT name FROM departments")
     departments = [row[0] for row in c.fetchall()]
@@ -400,9 +417,9 @@ def get_all_department_names() -> List[str]:
 
 
 def get_hospital_id_by_department(department_id: str) -> Optional[str]:
-    conn = sqlite3.connect(settings.DB_PATH)
+    conn = get_db_connection()
     c = conn.cursor()
-    c.execute("SELECT hospital_id FROM departments WHERE id = ?", (department_id,))
+    c.execute("SELECT hospital_id FROM departments WHERE id = %s", (department_id,))
     result = c.fetchone()
     conn.close()
     return result[0] if result else None
@@ -416,10 +433,10 @@ def get_doctor_id_by_username(username: str) -> Optional[str]:
         logger.error(f"Expected string username, got {type(username)}: {username}")
         raise ValueError(f"Invalid username type: {type(username)}")
 
-    conn = sqlite3.connect(settings.DB_PATH)
+    conn = get_db_connection()
     c = conn.cursor()
     c.execute(
-        "SELECT id FROM users WHERE username = ? AND role = 'doctor'", (username,)
+        "SELECT id FROM users WHERE username = %s AND role = 'doctor'", (username,)
     )
     result = c.fetchone()
     logger.debug(
@@ -564,7 +581,7 @@ TOOLS = [
 
 
 def router_agent(query: str, user_id: str) -> RouterResponse:
-    conn = sqlite3.connect(settings.DB_PATH)
+    conn = get_db_connection()
     c = conn.cursor()
     c.execute("SELECT name FROM departments")
     departments = [row[0] for row in c.fetchall()]
@@ -736,7 +753,7 @@ async def appointment_booking_agent(query: str, user_id: str) -> Dict:
                     }
 
                 # Get department and hospital IDs
-                conn = sqlite3.connect(settings.DB_PATH)
+                conn = get_db_connection()
                 c = conn.cursor()
 
                 # Fetch department_id from doctors table
@@ -744,7 +761,7 @@ async def appointment_booking_agent(query: str, user_id: str) -> Dict:
                     """
                     SELECT department_id
                     FROM doctors
-                    WHERE user_id = ?
+                    WHERE user_id = %s
                     """,
                     (doctor_id,),
                 )
@@ -775,7 +792,7 @@ async def appointment_booking_agent(query: str, user_id: str) -> Dict:
                     """
                     SELECT hospital_id
                     FROM departments
-                    WHERE id = ?
+                    WHERE id = %s
                     """,
                     (department_id,),
                 )

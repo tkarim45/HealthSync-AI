@@ -13,9 +13,9 @@ from langchain_pinecone import PineconeVectorStore
 import logging
 from config.settings import settings
 from typing import List
-import sqlite3
-from datetime import datetime
 import uuid
+import psycopg2
+from datetime import datetime
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -118,17 +118,27 @@ def initialize_rag_system():
 initialize_rag_system()
 
 
+def get_db_connection():
+    return psycopg2.connect(
+        dbname=settings.DB_NAME,
+        user=settings.DB_USER,
+        password=settings.DB_PASSWORD,
+        host=settings.DB_HOST,
+        port=settings.DB_PORT,
+    )
+
+
 # --- Chat History Storage for General Queries ---
 def store_general_chat_history(user_id: str, query: str, response: str):
-    """Store general query chat history in SQLite."""
-    conn = sqlite3.connect(settings.DB_PATH)
+    """Store general query chat history in PostgreSQL."""
+    conn = get_db_connection()
     c = conn.cursor()
     chat_id = str(uuid.uuid4())
     created_at = datetime.utcnow().isoformat()
     c.execute(
         """
         INSERT INTO general_chat_history (id, user_id, query, response, created_at)
-        VALUES (?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s)
         """,
         (chat_id, user_id, query, response, created_at),
     )
@@ -137,15 +147,15 @@ def store_general_chat_history(user_id: str, query: str, response: str):
     logger.info(f"Stored chat history for user {user_id}")
 
 
-def get_general_chat_history(user_id: str) -> List[dict]:
-    """Retrieve general query chat history for a user."""
-    conn = sqlite3.connect(settings.DB_PATH)
+def get_general_chat_history(user_id: str) -> list:
+    """Retrieve general query chat history for a user from PostgreSQL."""
+    conn = get_db_connection()
     c = conn.cursor()
     c.execute(
         """
         SELECT query, response, created_at
         FROM general_chat_history
-        WHERE user_id = ?
+        WHERE user_id = %s
         ORDER BY created_at DESC
         LIMIT 2
         """,

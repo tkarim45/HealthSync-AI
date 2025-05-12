@@ -10,9 +10,8 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - ALLOWED_ORIGINS=http://localhost:3000
-      - DB_PATH=/app/healthsync.db
-    volumes:
-      - db_data:/app
+    depends_on:
+      - postgres
     networks:
       - app-network
 
@@ -29,9 +28,22 @@ services:
     networks:
       - app-network
 
+  postgres:
+    image: postgres:16
+    environment:
+      - POSTGRES_DB=healthsync
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - app-network
+
 networks:
   app-network:
     driver: bridge
 
 volumes:
-  db_data:
+  postgres_data:
