@@ -814,3 +814,17 @@
 [2025-05-15T10:21:39.796+0000] {logging_mixin.py:154} INFO - [2025-05-15T10:21:39.796+0000] {dag.py:2941} INFO - Sync 1 DAGs
 [2025-05-15T10:21:39.831+0000] {logging_mixin.py:154} INFO - [2025-05-15T10:21:39.830+0000] {dag.py:3722} INFO - Setting next_dagrun for sample_etl to 2025-05-15T00:00:00+00:00, run_after=2025-05-16T00:00:00+00:00
 [2025-05-15T10:21:39.864+0000] {processor.py:179} INFO - Processing /opt/airflow/dags/sample_etl.py took 0.193 seconds
+[2025-05-15T10:22:10.256+0000] {processor.py:157} INFO - Started process (PID=947) to work on /opt/airflow/dags/sample_etl.py
+[2025-05-15T10:22:10.258+0000] {processor.py:829} INFO - Processing file /opt/airflow/dags/sample_etl.py for tasks to queue
+[2025-05-15T10:22:10.260+0000] {logging_mixin.py:154} INFO - [2025-05-15T10:22:10.259+0000] {dagbag.py:536} INFO - Filling up the DagBag from /opt/airflow/dags/sample_etl.py
+[2025-05-15T10:22:10.306+0000] {processor.py:839} INFO - DAG(s) dict_keys(['sample_etl']) retrieved from /opt/airflow/dags/sample_etl.py
+[2025-05-15T10:22:10.373+0000] {logging_mixin.py:154} INFO - [2025-05-15T10:22:10.373+0000] {dag.py:2941} INFO - Sync 1 DAGs
+[2025-05-15T10:22:10.403+0000] {logging_mixin.py:154} INFO - [2025-05-15T10:22:10.403+0000] {dag.py:3722} INFO - Setting next_dagrun for sample_etl to 2025-05-15T00:00:00+00:00, run_after=2025-05-16T00:00:00+00:00
+[2025-05-15T10:22:10.418+0000] {processor.py:179} INFO - Processing /opt/airflow/dags/sample_etl.py took 0.171 seconds
+[2025-05-15T10:22:40.775+0000] {processor.py:157} INFO - Started process (PID=952) to work on /opt/airflow/dags/sample_etl.py
+[2025-05-15T10:22:40.777+0000] {processor.py:829} INFO - Processing file /opt/airflow/dags/sample_etl.py for tasks to queue
+[2025-05-15T10:22:40.778+0000] {logging_mixin.py:154} INFO - [2025-05-15T10:22:40.777+0000] {dagbag.py:536} INFO - Filling up the DagBag from /opt/airflow/dags/sample_etl.py
+[2025-05-15T10:22:40.828+0000] {processor.py:839} INFO - DAG(s) dict_keys(['sample_etl']) retrieved from /opt/airflow/dags/sample_etl.py
+[2025-05-15T10:22:40.899+0000] {logging_mixin.py:154} INFO - [2025-05-15T10:22:40.899+0000] {dag.py:2941} INFO - Sync 1 DAGs
+[2025-05-15T10:22:40.932+0000] {logging_mixin.py:154} INFO - [2025-05-15T10:22:40.931+0000] {dag.py:3722} INFO - Setting next_dagrun for sample_etl to 2025-05-15T00:00:00+00:00, run_after=2025-05-16T00:00:00+00:00
+[2025-05-15T10:22:40.949+0000] {processor.py:179} INFO - Processing /opt/airflow/dags/sample_etl.py took 0.185 seconds
