@@ -716,7 +716,7 @@ const SuperAdminDashboard = () => {
     setAdminError("");
     setIsLoading(true);
     try {
-      const response = await fetch(`http://localhost:8000/api/hospitals/${adminForm.hospital_id}/assign_admin`, {
+      const response = await fetch(`http://localhost:8000/api/hospitals/${adminForm.hospital_id}/assign-admin`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

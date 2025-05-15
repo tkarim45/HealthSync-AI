@@ -254,7 +254,11 @@ const AdminDashboard = () => {
         }
 
         // Fetch departments
-        const departmentResponse = await fetch("http://localhost:8000/api/departments", {
+        let departmentsUrl = "http://localhost:8000/api/departments";
+        if (hospitalData && hospitalData.id) {
+          departmentsUrl += `?hospital_id=${hospitalData.id}`;
+        }
+        const departmentResponse = await fetch(departmentsUrl, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const departmentData = await departmentResponse.json();
@@ -265,7 +269,11 @@ const AdminDashboard = () => {
         }
 
         // Fetch doctors
-        const doctorResponse = await fetch("http://localhost:8000/api/doctors", {
+        let doctorsUrl = "http://localhost:8000/api/doctors";
+        if (hospitalData && hospitalData.id) {
+          doctorsUrl += `?hospital_id=${hospitalData.id}`;
+        }
+        const doctorResponse = await fetch(doctorsUrl, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const doctorData = await doctorResponse.json();

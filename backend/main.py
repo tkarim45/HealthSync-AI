@@ -30,14 +30,12 @@ from routes import auth
 from utils.pineconeutils import *
 from utils.email import *
 from utils.agents import *
-from utils.populate_dummy_data import populate_dummy_data
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 init_db()
-populate_dummy_data()
 
 app = FastAPI()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
@@ -104,42 +102,373 @@ async def initialize_users():
     else:
         logger.info(f"Super Admin user {super_admin_data['username']} already exists")
 
-    # Admin
-    admin_data = {
-        "username": "admin",
-        "email": "admin@gmail.com",
-        "password": "admin",
-        "role": "admin",
-    }
+    # Admin users data
+    admin_users = [
+        {
+            "username": "admin1",
+            "email": "admin1@gmail.com",
+            "password": "admin1",
+            "role": "admin",
+        },
+        {
+            "username": "admin2",
+            "email": "admin2@gmail.com",
+            "password": "admin2",
+            "role": "admin",
+        },
+        {
+            "username": "admin3",
+            "email": "admin3@gmail.com",
+            "password": "admin3",
+            "role": "admin",
+        },
+        {
+            "username": "admin4",
+            "email": "admin4@gmail.com",
+            "password": "admin4",
+            "role": "admin",
+        },
+        {
+            "username": "admin5",
+            "email": "admin5@gmail.com",
+            "password": "admin5",
+            "role": "admin",
+        },
+    ]
 
-    # Check if Admin exists
-    c.execute("SELECT id FROM users WHERE username = %s", (admin_data["username"],))
-    if not c.fetchone():
-        user_id = str(uuid.uuid4())
-        hashed_password = pwd_context.hash(admin_data["password"])
-        created_at = datetime.utcnow()
-        try:
+    # Check and create admin users
+    for admin_data in admin_users:
+        c.execute("SELECT id FROM users WHERE username = %s", (admin_data["username"],))
+        if not c.fetchone():
+            user_id = str(uuid.uuid4())
+            hashed_password = pwd_context.hash(admin_data["password"])
+            created_at = datetime.utcnow()
+            try:
+                c.execute(
+                    """
+                    INSERT INTO users (id, username, email, password, role, created_at)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    """,
+                    (
+                        user_id,
+                        admin_data["username"],
+                        admin_data["email"],
+                        hashed_password,
+                        admin_data["role"],
+                        created_at,
+                    ),
+                )
+                conn.commit()
+                logger.info(f"Created Admin user: {admin_data['username']}")
+            except psycopg2.IntegrityError as e:
+                conn.rollback()
+                logger.error(f"Failed to create Admin: {str(e)}")
+        else:
+            logger.info(f"Admin user {admin_data['username']} already exists")
+
+    # Create dummy hospitals
+    hospitals = [
+        {
+            "id": str(uuid.uuid4()),
+            "name": "Hospital 1",
+            "address": "123 Main St, Anytown, USA",
+            "lat": 37.7749,
+            "lng": -122.4194,
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "name": "Hospital 2",
+            "address": "456 Oak Ave, Anytown, USA",
+            "lat": 37.7749,
+            "lng": -122.4194,
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "name": "Hospital 3",
+            "address": "789 Pine St, Anytown, USA",
+            "lat": 37.7749,
+            "lng": -122.4194,
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "name": "Hospital 4",
+            "address": "1011 Maple St, Anytown, USA",
+            "lat": 37.7749,
+            "lng": -122.4194,
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "name": "Hospital 5",
+            "address": "1213 Cedar St, Anytown, USA",
+            "lat": 37.7749,
+            "lng": -122.4194,
+        },
+    ]
+
+    ### check if hospitals already exist
+    c.execute("SELECT id FROM hospitals")
+    existing_hospitals = c.fetchall()
+    existing_hospital_ids = [row[0] for row in existing_hospitals]
+
+    for hospital in hospitals:
+        c.execute("SELECT id FROM hospitals WHERE name = %s", (hospital["name"],))
+        if not c.fetchone():
+            c.execute(
+                "INSERT INTO hospitals (id, name, address, lat, lng) VALUES (%s, %s, %s, %s, %s)",
+                (
+                    hospital["id"],
+                    hospital["name"],
+                    hospital["address"],
+                    hospital["lat"],
+                    hospital["lng"],
+                ),
+            )
+            conn.commit()
+            logger.info(f"Created Hospital: {hospital['name']}")
+        else:
+            logger.info(f"Hospital {hospital['name']} already exists")
+
+    # Assign each admin a single hospital
+    for admin in admin_users:
+        c.execute("SELECT id FROM users WHERE username = %s", (admin["username"],))
+        admin_id = c.fetchone()[0]
+        c.execute("SELECT id FROM hospitals")
+        hospital_id = c.fetchone()[0]
+        # Check if this assignment already exists
+        c.execute(
+            "SELECT 1 FROM hospital_admins WHERE user_id = %s AND hospital_id = %s",
+            (admin_id, hospital_id),
+        )
+        if not c.fetchone():
+            c.execute(
+                "INSERT INTO hospital_admins (user_id, hospital_id) VALUES (%s, %s)",
+                (admin_id, hospital_id),
+            )
+            conn.commit()
+            logger.info(f"Assigned admin {admin_id} to hospital {hospital_id}")
+        else:
+            logger.info(f"Admin {admin_id} already assigned to hospital {hospital_id}")
+
+    # Create dummy departments
+    departments = [
+        "Department of Oncology",
+        "Department of Cardiology",
+        "Department of Neurology",
+        "Department of Pediatrics",
+        "Department of Surgery",
+    ]
+
+    # Get all hospital IDs
+    c.execute("SELECT id FROM hospitals")
+    hospital_ids = [row[0] for row in c.fetchall()]
+
+    for hospital_id in hospital_ids:
+        for department in departments:
+            # Check if department already exists for this hospital
+            c.execute(
+                "SELECT id FROM departments WHERE name = %s AND hospital_id = %s",
+                (department, hospital_id),
+            )
+            if not c.fetchone():
+                department_id = str(uuid.uuid4())
+                c.execute(
+                    "INSERT INTO departments (id, hospital_id, name) VALUES (%s, %s, %s)",
+                    (department_id, hospital_id, department),
+                )
+                conn.commit()
+                logger.info(
+                    f"Created Department: {department} in hospital {hospital_id}"
+                )
+            else:
+                logger.info(
+                    f"Department {department} already exists in hospital {hospital_id}"
+                )
+
+    # --- Create dummy patients ---
+    dummy_patients = [
+        {
+            "username": f"patient{i+1}",
+            "email": f"patient{i+1}@example.com",
+            "password": "patient123",
+            "role": "user",
+        }
+        for i in range(4)
+    ]
+    patient_ids = []
+    for patient in dummy_patients:
+        c.execute("SELECT id FROM users WHERE username = %s", (patient["username"],))
+        row = c.fetchone()
+        if row:
+            patient_id = row[0]
+            logger.info(f"Dummy patient {patient['username']} already exists")
+        else:
+            patient_id = str(uuid.uuid4())
+            hashed_password = pwd_context.hash(patient["password"])
+            created_at = datetime.utcnow()
             c.execute(
                 """
                 INSERT INTO users (id, username, email, password, role, created_at)
                 VALUES (%s, %s, %s, %s, %s, %s)
                 """,
                 (
-                    user_id,
-                    admin_data["username"],
-                    admin_data["email"],
+                    patient_id,
+                    patient["username"],
+                    patient["email"],
                     hashed_password,
-                    admin_data["role"],
+                    patient["role"],
                     created_at,
                 ),
             )
             conn.commit()
-            logger.info(f"Created Admin user: {admin_data['username']}")
-        except psycopg2.IntegrityError as e:
-            conn.rollback()
-            logger.error(f"Failed to create Admin: {str(e)}")
-    else:
-        logger.info(f"Admin user {admin_data['username']} already exists")
+            logger.info(f"Created dummy patient: {patient['username']}")
+        patient_ids.append(patient_id)
+
+    # --- Create dummy doctors and appointments ---
+    c.execute("SELECT id, name, hospital_id FROM departments")
+    all_departments = c.fetchall()  # (dept_id, dept_name, hospital_id)
+    for dept_idx, (dept_id, dept_name, hospital_id) in enumerate(all_departments):
+        for doc_num in range(2):
+            doc_username = f"doctor_{hospital_id[:8]}_{dept_id[:8]}_{doc_num+1}"
+            doc_email = f"{doc_username}@example.com"
+            c.execute("SELECT id FROM users WHERE username = %s", (doc_username,))
+            user_row = c.fetchone()
+            if user_row:
+                doctor_user_id = user_row[0]
+                logger.info(f"Doctor {doc_username} already exists")
+            else:
+                doctor_user_id = str(uuid.uuid4())
+                hashed_password = pwd_context.hash("doctor123")
+                created_at = datetime.utcnow()
+                c.execute(
+                    """
+                    INSERT INTO users (id, username, email, password, role, created_at)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    """,
+                    (
+                        doctor_user_id,
+                        doc_username,
+                        doc_email,
+                        hashed_password,
+                        "doctor",
+                        created_at,
+                    ),
+                )
+                logger.info(f"Created doctor user: {doc_username}")
+            # Check if doctor is already assigned to this department
+            c.execute(
+                "SELECT user_id FROM doctors WHERE user_id = %s AND department_id = %s",
+                (doctor_user_id, dept_id),
+            )
+            if not c.fetchone():
+                c.execute(
+                    """
+                    INSERT INTO doctors (user_id, department_id, specialty, title, phone, bio)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    """,
+                    (
+                        doctor_user_id,
+                        dept_id,
+                        f"Specialty {dept_name}",
+                        "Consultant",
+                        f"+123456789{doc_num}",
+                        f"Bio for {doc_username}",
+                    ),
+                )
+                logger.info(f"Assigned doctor {doc_username} to department {dept_id}")
+                # Initialize availability (Mon–Sat, 9 AM–6 PM, 30-min slots)
+                days = [
+                    "Monday",
+                    "Tuesday",
+                    "Wednesday",
+                    "Thursday",
+                    "Friday",
+                    "Saturday",
+                ]
+                slots = [
+                    ("09:00", "09:30"),
+                    ("09:30", "10:00"),
+                    ("10:00", "10:30"),
+                    ("10:30", "11:00"),
+                    ("11:00", "11:30"),
+                    ("11:30", "12:00"),
+                    ("12:00", "12:30"),
+                    ("12:30", "13:00"),
+                    ("13:00", "13:30"),
+                    ("13:30", "14:00"),
+                    ("14:00", "14:30"),
+                    ("14:30", "15:00"),
+                    ("15:00", "15:30"),
+                    ("15:30", "16:00"),
+                    ("16:00", "16:30"),
+                    ("16:30", "17:00"),
+                    ("17:00", "17:30"),
+                    ("17:30", "18:00"),
+                ]
+                for day in days:
+                    for start, end in slots:
+                        availability_id = str(uuid.uuid4())
+                        c.execute(
+                            """
+                            INSERT INTO doctor_availability (id, user_id, day_of_week, start_time, end_time)
+                            VALUES (%s, %s, %s, %s, %s)
+                            ON CONFLICT DO NOTHING
+                            """,
+                            (availability_id, doctor_user_id, day, start, end),
+                        )
+                conn.commit()
+            # --- Create 3-4 dummy appointments for this doctor ---
+            today = datetime.utcnow().date()
+            for appt_num in range(3):
+                appt_date = today + timedelta(days=appt_num)
+                # Use the first available slot for the day
+                day_of_week = appt_date.strftime("%A")
+                c.execute(
+                    """
+                    SELECT start_time, end_time FROM doctor_availability
+                    WHERE user_id = %s AND day_of_week = %s
+                    ORDER BY start_time LIMIT 1 OFFSET %s
+                    """,
+                    (doctor_user_id, day_of_week, appt_num),
+                )
+                slot = c.fetchone()
+                if not slot:
+                    continue
+                start_time, end_time = slot
+                patient_id = patient_ids[appt_num % len(patient_ids)]
+                # Check if appointment already exists
+                c.execute(
+                    """
+                    SELECT id FROM appointments WHERE doctor_id = %s AND appointment_date = %s AND start_time = %s
+                    """,
+                    (doctor_user_id, appt_date.isoformat(), start_time),
+                )
+                if not c.fetchone():
+                    appointment_id = str(uuid.uuid4())
+                    created_at = datetime.utcnow()
+                    c.execute(
+                        """
+                        INSERT INTO appointments (
+                            id, user_id, doctor_id, department_id, hospital_id, appointment_date,
+                            start_time, end_time, status, created_at
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """,
+                        (
+                            appointment_id,
+                            patient_id,
+                            doctor_user_id,
+                            dept_id,
+                            hospital_id,
+                            appt_date.isoformat(),
+                            start_time,
+                            end_time,
+                            "scheduled",
+                            created_at,
+                        ),
+                    )
+                    conn.commit()
+                    logger.info(
+                        f"Created dummy appointment for doctor {doc_username} and patient {patient_id} on {appt_date} at {start_time}"
+                    )
 
     conn.close()
 
@@ -896,6 +1225,15 @@ async def get_departments(
         port=settings.DB_PORT,
     )
     c = conn.cursor()
+    # If user is admin and no hospital_id is provided, use their hospital
+    if current_user["role"] == "admin" and not hospital_id:
+        c.execute(
+            "SELECT hospital_id FROM hospital_admins WHERE user_id = %s",
+            (current_user["user_id"],),
+        )
+        row = c.fetchone()
+        if row:
+            hospital_id = row[0]
     query = """
         SELECT d.id, d.hospital_id, d.name, h.name
         FROM departments d
@@ -939,7 +1277,18 @@ async def get_doctors(
         JOIN departments d ON doc.department_id = d.id
     """
     params = []
-    if department_id:
+    # If admin and no department_id, filter by their hospital
+    if current_user["role"] == "admin" and not department_id:
+        c.execute(
+            "SELECT hospital_id FROM hospital_admins WHERE user_id = %s",
+            (current_user["user_id"],),
+        )
+        row = c.fetchone()
+        if row:
+            hospital_id = row[0]
+            query += " WHERE d.hospital_id = %s"
+            params.append(hospital_id)
+    elif department_id:
         query += " WHERE doc.department_id = %s"
         params.append(department_id)
     c.execute(query, params)
