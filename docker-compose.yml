@@ -41,9 +41,69 @@ services:
     networks:
       - app-network
 
+  airflow:
+    image: apache/airflow:2.7.3
+    platform: linux/amd64
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://postgres:postgres@postgres/healthsync
+      - AIRFLOW__CORE__FERNET_KEY=cFZ65HqivTVMGwgKoptc_TftEYQfScaXVBw0_fhfZTg=
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW__WEBSERVER__SECRET_KEY=your_secret_key_here
+      - AIRFLOW_CONN_POSTGRES_DEFAULT=postgresql://postgres:postgres@postgres:5432/healthsync
+      - AIRFLOW__SMTP__SMTP_HOST=smtp.gmail.com
+      - AIRFLOW__SMTP__SMTP_STARTTLS=True
+      - AIRFLOW__SMTP__SMTP_SSL=False
+      - AIRFLOW__SMTP__SMTP_USER=taimourabdulkarim45@gmail.com
+      - AIRFLOW__SMTP__SMTP_PASSWORD=fmda yvbs vena pxqh
+      - AIRFLOW__SMTP__SMTP_PORT=587
+      - AIRFLOW__SMTP__SMTP_MAIL_FROM=taimourabdulkarim45@gmail.com
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - ./airflow/plugins:/opt/airflow/plugins
+      - ./airflow/wait-for-postgres.sh:/wait-for-postgres.sh
+      - /var/run/docker.sock:/var/run/docker.sock
+    entrypoint: ["/wait-for-postgres.sh", "postgres", "airflow", "standalone"]
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+    networks:
+      - app-network
+
+  dbt:
+    image: ghcr.io/dbt-labs/dbt-postgres:1.7.4
+    volumes:
+      - ./dbt:/usr/app
+      - ./dbt/profiles.yml:/root/.dbt/profiles.yml
+    working_dir: /usr/app
+    entrypoint: ["tail", "-f", "/dev/null"] # Keeps the container running for interactive use
+    depends_on:
+      - postgres
+    networks:
+      - app-network
+
+  grafana:
+    image: grafana/grafana:10.2.3
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    ports:
+      - "3001:3000"
+    depends_on:
+      - postgres
+    networks:
+      - app-network
+    volumes:
+      - grafana_data:/var/lib/grafana
+
 networks:
   app-network:
     driver: bridge
 
 volumes:
   postgres_data:
+  airflow_logs:
+  airflow_plugins:
+  grafana_data:

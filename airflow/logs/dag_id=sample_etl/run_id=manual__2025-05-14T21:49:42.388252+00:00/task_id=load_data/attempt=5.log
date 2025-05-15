@@ -1,0 +1,42 @@
+[2025-05-14T22:01:30.864+0000] {taskinstance.py:1159} INFO - Dependencies all met for dep_context=non-requeueable deps ti=<TaskInstance: sample_etl.load_data manual__2025-05-14T21:49:42.388252+00:00 [queued]>
+[2025-05-14T22:01:30.876+0000] {taskinstance.py:1159} INFO - Dependencies all met for dep_context=requeueable deps ti=<TaskInstance: sample_etl.load_data manual__2025-05-14T21:49:42.388252+00:00 [queued]>
+[2025-05-14T22:01:30.876+0000] {taskinstance.py:1361} INFO - Starting attempt 5 of 7
+[2025-05-14T22:01:30.891+0000] {taskinstance.py:1382} INFO - Executing <Task(PostgresOperator): load_data> on 2025-05-14 21:49:42.388252+00:00
+[2025-05-14T22:01:30.897+0000] {standard_task_runner.py:57} INFO - Started process 214 to run task
+[2025-05-14T22:01:30.901+0000] {standard_task_runner.py:84} INFO - Running: ['airflow', 'tasks', 'run', 'sample_etl', 'load_data', 'manual__2025-05-14T21:49:42.388252+00:00', '--job-id', '23', '--raw', '--subdir', 'DAGS_FOLDER/sample_etl.py', '--cfg-path', '/tmp/tmpf8fyi74r']
+[2025-05-14T22:01:30.904+0000] {standard_task_runner.py:85} INFO - Job 23: Subtask load_data
+[2025-05-14T22:01:30.924+0000] {logging_mixin.py:154} WARNING - /home/airflow/.local/lib/python3.8/site-packages/airflow/settings.py:195 DeprecationWarning: The sql_alchemy_conn option in [core] has been moved to the sql_alchemy_conn option in [database] - the old setting has been used, but please update your config.
+[2025-05-14T22:01:30.956+0000] {task_command.py:416} INFO - Running <TaskInstance: sample_etl.load_data manual__2025-05-14T21:49:42.388252+00:00 [running]> on host 377a65512f9b
+[2025-05-14T22:01:31.043+0000] {taskinstance.py:1662} INFO - Exporting env vars: AIRFLOW_CTX_DAG_EMAIL='taimourabdulkarim20@gmail.com' AIRFLOW_CTX_DAG_OWNER='airflow' AIRFLOW_CTX_DAG_ID='sample_etl' AIRFLOW_CTX_TASK_ID='load_data' AIRFLOW_CTX_EXECUTION_DATE='2025-05-14T21:49:42.388252+00:00' AIRFLOW_CTX_TRY_NUMBER='5' AIRFLOW_CTX_DAG_RUN_ID='manual__2025-05-14T21:49:42.388252+00:00'
+[2025-05-14T22:01:31.044+0000] {sql.py:274} INFO - Executing: 
+            INSERT INTO etl_stats (run_date, doctor_count)
+            SELECT CURRENT_DATE, COUNT(*) FROM users WHERE role = 'doctor'
+            ON CONFLICT (run_date) DO UPDATE
+            SET doctor_count = EXCLUDED.doctor_count;
+        
+[2025-05-14T22:01:31.107+0000] {base.py:73} INFO - Using connection ID '***_default' for task execution.
+[2025-05-14T22:01:31.114+0000] {base.py:73} INFO - Using connection ID '***_default' for task execution.
+[2025-05-14T22:01:31.123+0000] {sql.py:418} INFO - Running statement: 
+            INSERT INTO etl_stats (run_date, doctor_count)
+            SELECT CURRENT_DATE, COUNT(*) FROM users WHERE role = 'doctor'
+            ON CONFLICT (run_date) DO UPDATE
+            SET doctor_count = EXCLUDED.doctor_count;
+        , parameters: None
+[2025-05-14T22:01:31.128+0000] {taskinstance.py:1937} ERROR - Task failed with exception
+Traceback (most recent call last):
+  File "/home/airflow/.local/lib/python3.8/site-packages/airflow/providers/common/sql/operators/sql.py", line 280, in execute
+    output = hook.run(
+  File "/home/airflow/.local/lib/python3.8/site-packages/airflow/providers/common/sql/hooks/sql.py", line 392, in run
+    self._run_command(cur, sql_statement, parameters)
+  File "/home/airflow/.local/lib/python3.8/site-packages/airflow/providers/common/sql/hooks/sql.py", line 423, in _run_command
+    cur.execute(sql_statement)
+psycopg2.errors.InvalidColumnReference: there is no unique or exclusion constraint matching the ON CONFLICT specification
+
+[2025-05-14T22:01:31.145+0000] {taskinstance.py:1400} INFO - Marking task as UP_FOR_RETRY. dag_id=sample_etl, task_id=load_data, execution_date=20250514T214942, start_date=20250514T220130, end_date=20250514T220131
+[2025-05-14T22:01:31.158+0000] {logging_mixin.py:154} WARNING - /home/airflow/.local/lib/python3.8/site-packages/airflow/utils/email.py:154 RemovedInAirflow3Warning: Fetching SMTP credentials from configuration variables will be deprecated in a future release. Please set credentials using a connection instead.
+[2025-05-14T22:01:31.158+0000] {email.py:270} INFO - Email alerting: attempt 1
+[2025-05-14T22:01:32.462+0000] {email.py:281} INFO - Sent an alert email to ['taimourabdulkarim20@gmail.com']
+[2025-05-14T22:01:33.678+0000] {standard_task_runner.py:104} ERROR - Failed to execute job 23 for task load_data (there is no unique or exclusion constraint matching the ON CONFLICT specification
+; 214)
+[2025-05-14T22:01:33.735+0000] {local_task_job_runner.py:228} INFO - Task exited with return code 1
+[2025-05-14T22:01:33.826+0000] {taskinstance.py:2778} INFO - 0 downstream tasks scheduled from follow-on schedule check

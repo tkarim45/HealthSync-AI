@@ -1,0 +1,36 @@
+[2025-05-12T11:27:55.668+0000] {taskinstance.py:1159} INFO - Dependencies all met for dep_context=non-requeueable deps ti=<TaskInstance: sample_etl.create_table manual__2025-05-12T11:27:54.809350+00:00 [queued]>
+[2025-05-12T11:27:55.677+0000] {taskinstance.py:1159} INFO - Dependencies all met for dep_context=requeueable deps ti=<TaskInstance: sample_etl.create_table manual__2025-05-12T11:27:54.809350+00:00 [queued]>
+[2025-05-12T11:27:55.677+0000] {taskinstance.py:1361} INFO - Starting attempt 1 of 1
+[2025-05-12T11:27:55.688+0000] {taskinstance.py:1382} INFO - Executing <Task(PostgresOperator): create_table> on 2025-05-12 11:27:54.809350+00:00
+[2025-05-12T11:27:55.694+0000] {standard_task_runner.py:57} INFO - Started process 292 to run task
+[2025-05-12T11:27:55.704+0000] {standard_task_runner.py:84} INFO - Running: ['airflow', 'tasks', 'run', 'sample_etl', 'create_table', 'manual__2025-05-12T11:27:54.809350+00:00', '--job-id', '6', '--raw', '--subdir', 'DAGS_FOLDER/sample_etl.py', '--cfg-path', '/tmp/tmp4vsrzu43']
+[2025-05-12T11:27:55.707+0000] {standard_task_runner.py:85} INFO - Job 6: Subtask create_table
+[2025-05-12T11:27:55.736+0000] {logging_mixin.py:154} WARNING - /home/airflow/.local/lib/python3.8/site-packages/airflow/settings.py:195 DeprecationWarning: The sql_alchemy_conn option in [core] has been moved to the sql_alchemy_conn option in [database] - the old setting has been used, but please update your config.
+[2025-05-12T11:27:55.785+0000] {task_command.py:416} INFO - Running <TaskInstance: sample_etl.create_table manual__2025-05-12T11:27:54.809350+00:00 [running]> on host d784e67a65f1
+[2025-05-12T11:27:55.864+0000] {taskinstance.py:1662} INFO - Exporting env vars: AIRFLOW_CTX_DAG_OWNER='airflow' AIRFLOW_CTX_DAG_ID='sample_etl' AIRFLOW_CTX_TASK_ID='create_table' AIRFLOW_CTX_EXECUTION_DATE='2025-05-12T11:27:54.809350+00:00' AIRFLOW_CTX_TRY_NUMBER='1' AIRFLOW_CTX_DAG_RUN_ID='manual__2025-05-12T11:27:54.809350+00:00'
+[2025-05-12T11:27:55.865+0000] {sql.py:274} INFO - Executing: 
+            CREATE TABLE IF NOT EXISTS etl_stats (
+                id SERIAL PRIMARY KEY,
+                run_date DATE,
+                doctor_count INT
+            );
+        
+[2025-05-12T11:27:55.885+0000] {taskinstance.py:1937} ERROR - Task failed with exception
+Traceback (most recent call last):
+  File "/home/airflow/.local/lib/python3.8/site-packages/airflow/providers/common/sql/operators/sql.py", line 275, in execute
+    hook = self.get_db_hook()
+  File "/home/airflow/.local/lib/python3.8/site-packages/airflow/providers/common/sql/operators/sql.py", line 186, in get_db_hook
+    return self._hook
+  File "/usr/local/lib/python3.8/functools.py", line 967, in __get__
+    val = self.func(instance)
+  File "/home/airflow/.local/lib/python3.8/site-packages/airflow/providers/common/sql/operators/sql.py", line 148, in _hook
+    conn = BaseHook.get_connection(conn_id)
+  File "/home/airflow/.local/lib/python3.8/site-packages/airflow/hooks/base.py", line 72, in get_connection
+    conn = Connection.get_connection_from_secrets(conn_id)
+  File "/home/airflow/.local/lib/python3.8/site-packages/airflow/models/connection.py", line 477, in get_connection_from_secrets
+    raise AirflowNotFoundException(f"The conn_id `{conn_id}` isn't defined")
+airflow.exceptions.AirflowNotFoundException: The conn_id `***_default` isn't defined
+[2025-05-12T11:27:55.899+0000] {taskinstance.py:1400} INFO - Marking task as FAILED. dag_id=sample_etl, task_id=create_table, execution_date=20250512T112754, start_date=20250512T112755, end_date=20250512T112755
+[2025-05-12T11:27:55.909+0000] {standard_task_runner.py:104} ERROR - Failed to execute job 6 for task create_table (The conn_id `***_default` isn't defined; 292)
+[2025-05-12T11:27:55.930+0000] {local_task_job_runner.py:228} INFO - Task exited with return code 1
+[2025-05-12T11:27:55.952+0000] {taskinstance.py:2778} INFO - 0 downstream tasks scheduled from follow-on schedule check

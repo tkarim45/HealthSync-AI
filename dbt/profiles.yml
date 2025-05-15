@@ -1,0 +1,11 @@
+healthsync_dbt:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: postgres
+      user: postgres
+      password: postgres
+      dbname: healthsync
+      port: 5432
+      schema: public

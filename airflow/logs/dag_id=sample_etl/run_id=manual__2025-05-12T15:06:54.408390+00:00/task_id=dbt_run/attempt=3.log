@@ -1,0 +1,32 @@
+[2025-05-12T15:15:38.730+0000] {taskinstance.py:1159} INFO - Dependencies all met for dep_context=non-requeueable deps ti=<TaskInstance: sample_etl.dbt_run manual__2025-05-12T15:06:54.408390+00:00 [queued]>
+[2025-05-12T15:15:38.740+0000] {taskinstance.py:1159} INFO - Dependencies all met for dep_context=requeueable deps ti=<TaskInstance: sample_etl.dbt_run manual__2025-05-12T15:06:54.408390+00:00 [queued]>
+[2025-05-12T15:15:38.740+0000] {taskinstance.py:1361} INFO - Starting attempt 3 of 5
+[2025-05-12T15:15:38.754+0000] {taskinstance.py:1382} INFO - Executing <Task(BashOperator): dbt_run> on 2025-05-12 15:06:54.408390+00:00
+[2025-05-12T15:15:38.760+0000] {standard_task_runner.py:57} INFO - Started process 220 to run task
+[2025-05-12T15:15:38.767+0000] {standard_task_runner.py:84} INFO - Running: ['airflow', 'tasks', 'run', 'sample_etl', 'dbt_run', 'manual__2025-05-12T15:06:54.408390+00:00', '--job-id', '61', '--raw', '--subdir', 'DAGS_FOLDER/sample_etl.py', '--cfg-path', '/tmp/tmp6pzyg4o2']
+[2025-05-12T15:15:38.771+0000] {standard_task_runner.py:85} INFO - Job 61: Subtask dbt_run
+[2025-05-12T15:15:38.801+0000] {logging_mixin.py:154} WARNING - /home/airflow/.local/lib/python3.8/site-packages/airflow/settings.py:195 DeprecationWarning: The sql_alchemy_conn option in [core] has been moved to the sql_alchemy_conn option in [database] - the old setting has been used, but please update your config.
+[2025-05-12T15:15:38.847+0000] {task_command.py:416} INFO - Running <TaskInstance: sample_etl.dbt_run manual__2025-05-12T15:06:54.408390+00:00 [running]> on host 16a01132c636
+[2025-05-12T15:15:38.959+0000] {taskinstance.py:1662} INFO - Exporting env vars: AIRFLOW_CTX_DAG_EMAIL='taimourabdulkarim20@gmail.com' AIRFLOW_CTX_DAG_OWNER='airflow' AIRFLOW_CTX_DAG_ID='sample_etl' AIRFLOW_CTX_TASK_ID='dbt_run' AIRFLOW_CTX_EXECUTION_DATE='2025-05-12T15:06:54.408390+00:00' AIRFLOW_CTX_TRY_NUMBER='3' AIRFLOW_CTX_DAG_RUN_ID='manual__2025-05-12T15:06:54.408390+00:00'
+[2025-05-12T15:15:38.965+0000] {subprocess.py:63} INFO - Tmp dir root location: /tmp
+[2025-05-12T15:15:38.966+0000] {subprocess.py:75} INFO - Running command: ['/bin/bash', '-c', 'docker exec -i $(docker ps -qf "ancestor=ghcr.io/dbt-labs/dbt-***:1.7.4") dbt run --project-dir /usr/app --profiles-dir /usr/app']
+[2025-05-12T15:15:38.978+0000] {subprocess.py:86} INFO - Output:
+[2025-05-12T15:15:42.296+0000] {subprocess.py:93} INFO - [0m15:15:42  Running with dbt=1.7.4
+[2025-05-12T15:15:42.600+0000] {subprocess.py:93} INFO - [0m15:15:42  Registered adapter: ***=1.7.4
+[2025-05-12T15:15:42.612+0000] {subprocess.py:93} INFO - [0m15:15:42  Unable to do partial parsing because saved manifest not found. Starting full parse.
+[2025-05-12T15:15:43.458+0000] {subprocess.py:93} INFO - [0m15:15:43  Found 1 model, 0 sources, 0 exposures, 0 metrics, 401 macros, 0 groups, 0 semantic models
+[2025-05-12T15:15:43.462+0000] {subprocess.py:93} INFO - [0m15:15:43
+[2025-05-12T15:15:43.659+0000] {subprocess.py:93} INFO - [0m15:15:43  Concurrency: 1 threads (target='dev')
+[2025-05-12T15:15:43.659+0000] {subprocess.py:93} INFO - [0m15:15:43
+[2025-05-12T15:15:43.668+0000] {subprocess.py:93} INFO - [0m15:15:43  1 of 1 START sql view model public.doctor_appointments ......................... [RUN]
+[2025-05-12T15:15:43.780+0000] {subprocess.py:93} INFO - [0m15:15:43  1 of 1 OK created sql view model public.doctor_appointments .................... [[32mCREATE VIEW[0m in 0.11s]
+[2025-05-12T15:15:43.803+0000] {subprocess.py:93} INFO - [0m15:15:43
+[2025-05-12T15:15:43.805+0000] {subprocess.py:93} INFO - [0m15:15:43  Finished running 1 view model in 0 hours 0 minutes and 0.34 seconds (0.34s).
+[2025-05-12T15:15:43.820+0000] {subprocess.py:93} INFO - [0m15:15:43
+[2025-05-12T15:15:43.821+0000] {subprocess.py:93} INFO - [0m15:15:43  [32mCompleted successfully[0m
+[2025-05-12T15:15:43.822+0000] {subprocess.py:93} INFO - [0m15:15:43
+[2025-05-12T15:15:43.823+0000] {subprocess.py:93} INFO - [0m15:15:43  Done. PASS=1 WARN=0 ERROR=0 SKIP=0 TOTAL=1
+[2025-05-12T15:15:45.275+0000] {subprocess.py:97} INFO - Command exited with return code 0
+[2025-05-12T15:15:45.379+0000] {taskinstance.py:1400} INFO - Marking task as SUCCESS. dag_id=sample_etl, task_id=dbt_run, execution_date=20250512T150654, start_date=20250512T151538, end_date=20250512T151545
+[2025-05-12T15:15:45.445+0000] {local_task_job_runner.py:228} INFO - Task exited with return code 0
+[2025-05-12T15:15:45.529+0000] {taskinstance.py:2778} INFO - 0 downstream tasks scheduled from follow-on schedule check
