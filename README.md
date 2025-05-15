@@ -108,7 +108,7 @@ backend/
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/yourusername/healthsync-ai.git
+git clone https://github.com/tkarim45/HealthSync-AI.git
 cd healthsync-ai
 ```
 
