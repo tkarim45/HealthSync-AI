@@ -28,7 +28,7 @@ const Footer = () => {
 };
 
 // Dynamic Content Component
-const DoctorContent = ({ activeSection, department, todayAppointments, weekAppointments, medicalHistory, expandedAppointment, toggleMedicalHistory, error, viewMode, setViewMode }) => {
+const DoctorContent = ({ activeSection, department, todayAppointments, weekAppointments, upcomingAppointments, medicalHistory, expandedAppointment, toggleMedicalHistory, error, viewMode, setViewMode }) => {
   const contentVariants = {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
@@ -146,8 +146,11 @@ const DoctorContent = ({ activeSection, department, todayAppointments, weekAppoi
               <button onClick={() => setViewMode("week")} className={`px-4 py-2 rounded-lg font-semibold ${viewMode === "week" ? "bg-teal-500 text-white" : "bg-gray-200 text-gray-700"}`}>
                 This Week's Appointments
               </button>
+              <button onClick={() => setViewMode("upcoming")} className={`px-4 py-2 rounded-lg font-semibold ${viewMode === "upcoming" ? "bg-teal-500 text-white" : "bg-gray-200 text-gray-700"}`}>
+                Upcoming Appointments
+              </button>
             </div>
-            {viewMode === "today" ? renderAppointments(todayAppointments, "Today's Appointments") : renderAppointments(weekAppointments, "This Week's Appointments")}
+            {viewMode === "today" ? renderAppointments(todayAppointments, "Today's Appointments") : viewMode === "week" ? renderAppointments(weekAppointments, "This Week's Appointments") : renderAppointments(upcomingAppointments, "Upcoming Appointments")}
           </motion.div>
         );
       default:
@@ -165,6 +168,7 @@ const DoctorDashboard = () => {
   const [department, setDepartment] = useState(null);
   const [todayAppointments, setTodayAppointments] = useState([]);
   const [weekAppointments, setWeekAppointments] = useState([]);
+  const [upcomingAppointments, setUpcomingAppointments] = useState([]);
   const [medicalHistory, setMedicalHistory] = useState({});
   const [expandedAppointment, setExpandedAppointment] = useState(null);
   const [error, setError] = useState("");
@@ -208,6 +212,18 @@ const DoctorDashboard = () => {
         } else {
           console.error("Failed to fetch week's appointments:", weekData.detail);
           setError(weekData.detail || "Failed to fetch week's appointments");
+        }
+
+        // Fetch upcoming appointments
+        const upcomingResponse = await fetch("http://localhost:8000/api/doctor/appointments/upcoming", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const upcomingData = await upcomingResponse.json();
+        if (upcomingResponse.ok) {
+          setUpcomingAppointments(upcomingData);
+        } else {
+          console.error("Failed to fetch upcoming appointments:", upcomingData.detail);
+          setError(upcomingData.detail || "Failed to fetch upcoming appointments");
         }
       } catch (err) {
         console.error("Error fetching data:", err);
@@ -274,7 +290,7 @@ const DoctorDashboard = () => {
             ))}
           </div>
 
-          <DoctorContent activeSection={activeSection} department={department} todayAppointments={todayAppointments} weekAppointments={weekAppointments} medicalHistory={medicalHistory} expandedAppointment={expandedAppointment} toggleMedicalHistory={toggleMedicalHistory} error={error} viewMode={viewMode} setViewMode={setViewMode} />
+          <DoctorContent activeSection={activeSection} department={department} todayAppointments={todayAppointments} weekAppointments={weekAppointments} upcomingAppointments={upcomingAppointments} medicalHistory={medicalHistory} expandedAppointment={expandedAppointment} toggleMedicalHistory={toggleMedicalHistory} error={error} viewMode={viewMode} setViewMode={setViewMode} />
         </div>
       </main>
       <Footer />

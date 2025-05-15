@@ -713,18 +713,38 @@ async def create_department(
         raise HTTPException(status_code=404, detail="No hospital assigned")
     hospital_id = hospital_id[0]
 
+    # Check for existing department with same name in this hospital
+    c.execute(
+        "SELECT id FROM departments WHERE hospital_id = %s AND LOWER(name) = LOWER(%s)",
+        (hospital_id, department.name),
+    )
+    if c.fetchone():
+        conn.close()
+        raise HTTPException(
+            status_code=400,
+            detail="Department with this name already exists in your hospital.",
+        )
+
     department_id = str(uuid.uuid4())
     c.execute(
         "INSERT INTO departments (id, hospital_id, name) VALUES (%s, %s, %s)",
         (department_id, hospital_id, department.name),
     )
 
+    # Fetch hospital name
+    c.execute("SELECT name FROM hospitals WHERE id = %s", (hospital_id,))
+    hospital_row = c.fetchone()
+    hospital_name = hospital_row[0] if hospital_row else ""
+
     conn.commit()
     conn.close()
 
     logger.info(f"Department created: {department.name} in hospital {hospital_id}")
     return DepartmentResponse(
-        id=department_id, hospital_id=hospital_id, name=department.name
+        id=department_id,
+        hospital_id=hospital_id,
+        name=department.name,
+        hospital_name=hospital_name,
     )
 
 
@@ -906,12 +926,19 @@ async def get_departments(
         query += " WHERE d.hospital_id = %s"
         params.append(hospital_id)
     c.execute(query, params)
-    departments = [
-        DepartmentResponse(
-            id=row[0], hospital_id=row[1], name=row[2], hospital_name=row[3]
-        )
-        for row in c.fetchall()
-    ]
+    rows = c.fetchall()
+    # Deduplicate by (hospital_id, name)
+    seen = set()
+    departments = []
+    for row in rows:
+        key = (row[1], row[2].strip().lower())
+        if key not in seen:
+            seen.add(key)
+            departments.append(
+                DepartmentResponse(
+                    id=row[0], hospital_id=row[1], name=row[2], hospital_name=row[3]
+                )
+            )
     conn.close()
     logger.info(
         f"Fetched departments for user {current_user['user_id']}, hospital_id: {hospital_id}"
@@ -1426,6 +1453,57 @@ async def get_weekly_appointments(current_user: dict = Depends(get_current_user)
     logger.info(
         f"Fetched weekly appointments for doctor {current_user['user_id']} from {start_date} to {end_date}"
     )
+    return appointments
+
+
+@app.get("/api/doctor/appointments/upcoming", response_model=List[AppointmentResponse])
+async def get_upcoming_appointments(current_user: dict = Depends(get_current_user)):
+    if current_user["role"] != "doctor":
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    today = date.today().isoformat()
+    conn = psycopg2.connect(
+        dbname=settings.DB_NAME,
+        user=settings.DB_USER,
+        password=settings.DB_PASSWORD,
+        host=settings.DB_HOST,
+        port=settings.DB_PORT,
+    )
+    c = conn.cursor()
+    c.execute(
+        """
+        SELECT a.id, a.user_id, u.username, u.email, a.doctor_id, du.username, a.department_id,
+               d.name, a.appointment_date, a.start_time, a.end_time, a.status, a.created_at,
+               a.hospital_id
+        FROM appointments a
+        JOIN users u ON a.user_id = u.id
+        JOIN users du ON a.doctor_id = du.id
+        JOIN departments d ON a.department_id = d.id
+        WHERE a.doctor_id = %s AND a.appointment_date >= %s AND a.status != 'cancelled'
+        ORDER BY a.appointment_date, a.start_time
+        """,
+        (current_user["user_id"], today),
+    )
+    appointments = [
+        AppointmentResponse(
+            id=row[0],
+            user_id=row[1],
+            username=row[2],
+            email=row[3],
+            doctor_id=row[4],
+            doctor_username=row[5],
+            department_id=row[6],
+            department_name=row[7],
+            appointment_date=row[8],
+            start_time=row[9],
+            end_time=row[10],
+            status=row[11],
+            created_at=str(row[12]),
+            hospital_id=row[13],
+        )
+        for row in c.fetchall()
+    ]
+    conn.close()
     return appointments
 
 

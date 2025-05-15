@@ -27,3 +27,7 @@
       - SMTP_PORT=587
       - DB_PATH=/app/healthsync.db
       - LLAMA_PARSER_API_KEY=llx-jQp0zIARvoLlHMVHvytyjtoEJ7nqaGt7eFMGgV9eWKEhWCi5
+
+
+admin
+KR3B64BZFCEN3KVA

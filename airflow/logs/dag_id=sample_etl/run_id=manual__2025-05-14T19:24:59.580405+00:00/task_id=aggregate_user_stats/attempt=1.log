@@ -1,0 +1,40 @@
+[2025-05-14T19:25:05.217+0000] {taskinstance.py:1159} INFO - Dependencies all met for dep_context=non-requeueable deps ti=<TaskInstance: sample_etl.aggregate_user_stats manual__2025-05-14T19:24:59.580405+00:00 [queued]>
+[2025-05-14T19:25:05.232+0000] {taskinstance.py:1159} INFO - Dependencies all met for dep_context=requeueable deps ti=<TaskInstance: sample_etl.aggregate_user_stats manual__2025-05-14T19:24:59.580405+00:00 [queued]>
+[2025-05-14T19:25:05.234+0000] {taskinstance.py:1361} INFO - Starting attempt 1 of 3
+[2025-05-14T19:25:05.253+0000] {taskinstance.py:1382} INFO - Executing <Task(PostgresOperator): aggregate_user_stats> on 2025-05-14 19:24:59.580405+00:00
+[2025-05-14T19:25:05.261+0000] {standard_task_runner.py:57} INFO - Started process 313 to run task
+[2025-05-14T19:25:05.272+0000] {standard_task_runner.py:84} INFO - Running: ['airflow', 'tasks', 'run', 'sample_etl', 'aggregate_user_stats', 'manual__2025-05-14T19:24:59.580405+00:00', '--job-id', '117', '--raw', '--subdir', 'DAGS_FOLDER/sample_etl.py', '--cfg-path', '/tmp/tmpwfb9qrew']
+[2025-05-14T19:25:05.275+0000] {standard_task_runner.py:85} INFO - Job 117: Subtask aggregate_user_stats
+[2025-05-14T19:25:05.300+0000] {logging_mixin.py:154} WARNING - /home/airflow/.local/lib/python3.8/site-packages/airflow/settings.py:195 DeprecationWarning: The sql_alchemy_conn option in [core] has been moved to the sql_alchemy_conn option in [database] - the old setting has been used, but please update your config.
+[2025-05-14T19:25:05.342+0000] {task_command.py:416} INFO - Running <TaskInstance: sample_etl.aggregate_user_stats manual__2025-05-14T19:24:59.580405+00:00 [running]> on host 3dfadb756915
+[2025-05-14T19:25:05.416+0000] {taskinstance.py:1662} INFO - Exporting env vars: AIRFLOW_CTX_DAG_EMAIL='taimourabdulkarim20@gmail.com' AIRFLOW_CTX_DAG_OWNER='airflow' AIRFLOW_CTX_DAG_ID='sample_etl' AIRFLOW_CTX_TASK_ID='aggregate_user_stats' AIRFLOW_CTX_EXECUTION_DATE='2025-05-14T19:24:59.580405+00:00' AIRFLOW_CTX_TRY_NUMBER='1' AIRFLOW_CTX_DAG_RUN_ID='manual__2025-05-14T19:24:59.580405+00:00'
+[2025-05-14T19:25:05.417+0000] {sql.py:274} INFO - Executing: 
+            INSERT INTO user_stats (stat_date, total_users, new_users)
+            SELECT
+                CURRENT_DATE,
+                COUNT(*),
+                COUNT(*) FILTER (WHERE created_at::date = CURRENT_DATE)
+            FROM users
+            ON CONFLICT (stat_date) DO UPDATE
+            SET
+                total_users = EXCLUDED.total_users,
+                new_users = EXCLUDED.new_users;
+        
+[2025-05-14T19:25:05.442+0000] {base.py:73} INFO - Using connection ID '***_default' for task execution.
+[2025-05-14T19:25:05.447+0000] {base.py:73} INFO - Using connection ID '***_default' for task execution.
+[2025-05-14T19:25:05.454+0000] {sql.py:418} INFO - Running statement: 
+            INSERT INTO user_stats (stat_date, total_users, new_users)
+            SELECT
+                CURRENT_DATE,
+                COUNT(*),
+                COUNT(*) FILTER (WHERE created_at::date = CURRENT_DATE)
+            FROM users
+            ON CONFLICT (stat_date) DO UPDATE
+            SET
+                total_users = EXCLUDED.total_users,
+                new_users = EXCLUDED.new_users;
+        , parameters: None
+[2025-05-14T19:25:05.455+0000] {sql.py:427} INFO - Rows affected: 1
+[2025-05-14T19:25:05.467+0000] {taskinstance.py:1400} INFO - Marking task as SUCCESS. dag_id=sample_etl, task_id=aggregate_user_stats, execution_date=20250514T192459, start_date=20250514T192505, end_date=20250514T192505
+[2025-05-14T19:25:05.507+0000] {local_task_job_runner.py:228} INFO - Task exited with return code 0
+[2025-05-14T19:25:05.538+0000] {taskinstance.py:2778} INFO - 1 downstream tasks scheduled from follow-on schedule check

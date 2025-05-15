@@ -1,0 +1,66 @@
+[2025-05-14T19:24:10.813+0000] {taskinstance.py:1159} INFO - Dependencies all met for dep_context=non-requeueable deps ti=<TaskInstance: sample_etl.dbt_test scheduled__2025-05-13T00:00:00+00:00 [queued]>
+[2025-05-14T19:24:10.827+0000] {taskinstance.py:1159} INFO - Dependencies all met for dep_context=requeueable deps ti=<TaskInstance: sample_etl.dbt_test scheduled__2025-05-13T00:00:00+00:00 [queued]>
+[2025-05-14T19:24:10.827+0000] {taskinstance.py:1361} INFO - Starting attempt 1 of 3
+[2025-05-14T19:24:10.839+0000] {taskinstance.py:1382} INFO - Executing <Task(BashOperator): dbt_test> on 2025-05-13 00:00:00+00:00
+[2025-05-14T19:24:10.845+0000] {standard_task_runner.py:57} INFO - Started process 269 to run task
+[2025-05-14T19:24:10.854+0000] {standard_task_runner.py:84} INFO - Running: ['airflow', 'tasks', 'run', 'sample_etl', 'dbt_test', 'scheduled__2025-05-13T00:00:00+00:00', '--job-id', '109', '--raw', '--subdir', 'DAGS_FOLDER/sample_etl.py', '--cfg-path', '/tmp/tmpklsoflao']
+[2025-05-14T19:24:10.859+0000] {standard_task_runner.py:85} INFO - Job 109: Subtask dbt_test
+[2025-05-14T19:24:10.881+0000] {logging_mixin.py:154} WARNING - /home/airflow/.local/lib/python3.8/site-packages/airflow/settings.py:195 DeprecationWarning: The sql_alchemy_conn option in [core] has been moved to the sql_alchemy_conn option in [database] - the old setting has been used, but please update your config.
+[2025-05-14T19:24:10.938+0000] {task_command.py:416} INFO - Running <TaskInstance: sample_etl.dbt_test scheduled__2025-05-13T00:00:00+00:00 [running]> on host 3dfadb756915
+[2025-05-14T19:24:11.022+0000] {taskinstance.py:1662} INFO - Exporting env vars: AIRFLOW_CTX_DAG_EMAIL='taimourabdulkarim20@gmail.com' AIRFLOW_CTX_DAG_OWNER='airflow' AIRFLOW_CTX_DAG_ID='sample_etl' AIRFLOW_CTX_TASK_ID='dbt_test' AIRFLOW_CTX_EXECUTION_DATE='2025-05-13T00:00:00+00:00' AIRFLOW_CTX_TRY_NUMBER='1' AIRFLOW_CTX_DAG_RUN_ID='scheduled__2025-05-13T00:00:00+00:00'
+[2025-05-14T19:24:11.024+0000] {subprocess.py:63} INFO - Tmp dir root location: /tmp
+[2025-05-14T19:24:11.025+0000] {subprocess.py:75} INFO - Running command: ['/bin/bash', '-c', 'docker exec -i $(docker ps -qf "ancestor=ghcr.io/dbt-labs/dbt-***:1.7.4") dbt test --project-dir /usr/app']
+[2025-05-14T19:24:11.033+0000] {subprocess.py:86} INFO - Output:
+[2025-05-14T19:24:13.813+0000] {subprocess.py:93} INFO - [0m19:24:13  Running with dbt=1.7.4
+[2025-05-14T19:24:14.159+0000] {subprocess.py:93} INFO - [0m19:24:14  Registered adapter: ***=1.7.4
+[2025-05-14T19:24:14.234+0000] {subprocess.py:93} INFO - [0m19:24:14  Found 1 model, 0 sources, 0 exposures, 0 metrics, 401 macros, 0 groups, 0 semantic models
+[2025-05-14T19:24:14.237+0000] {subprocess.py:93} INFO - [0m19:24:14
+[2025-05-14T19:24:14.238+0000] {subprocess.py:93} INFO - [0m19:24:14  Nothing to do. Try checking your model configs and model specification args
+[2025-05-14T19:24:15.694+0000] {subprocess.py:97} INFO - Command exited with return code 0
+[2025-05-14T19:24:15.774+0000] {taskinstance.py:1400} INFO - Marking task as SUCCESS. dag_id=sample_etl, task_id=dbt_test, execution_date=20250513T000000, start_date=20250514T192410, end_date=20250514T192415
+[2025-05-14T19:24:15.825+0000] {local_task_job_runner.py:228} INFO - Task exited with return code 0
+[2025-05-14T19:24:15.882+0000] {taskinstance.py:2778} INFO - 1 downstream tasks scheduled from follow-on schedule check
+[2025-05-14T22:13:48.412+0000] {taskinstance.py:1159} INFO - Dependencies all met for dep_context=non-requeueable deps ti=<TaskInstance: sample_etl.dbt_test scheduled__2025-05-13T00:00:00+00:00 [queued]>
+[2025-05-14T22:13:48.430+0000] {taskinstance.py:1159} INFO - Dependencies all met for dep_context=requeueable deps ti=<TaskInstance: sample_etl.dbt_test scheduled__2025-05-13T00:00:00+00:00 [queued]>
+[2025-05-14T22:13:48.430+0000] {taskinstance.py:1361} INFO - Starting attempt 1 of 3
+[2025-05-14T22:13:48.445+0000] {taskinstance.py:1382} INFO - Executing <Task(BashOperator): dbt_test> on 2025-05-13 00:00:00+00:00
+[2025-05-14T22:13:48.457+0000] {standard_task_runner.py:57} INFO - Started process 568 to run task
+[2025-05-14T22:13:48.467+0000] {standard_task_runner.py:84} INFO - Running: ['airflow', 'tasks', 'run', 'sample_etl', 'dbt_test', 'scheduled__2025-05-13T00:00:00+00:00', '--job-id', '81', '--raw', '--subdir', 'DAGS_FOLDER/sample_etl.py', '--cfg-path', '/tmp/tmp_enq8hpl']
+[2025-05-14T22:13:48.472+0000] {standard_task_runner.py:85} INFO - Job 81: Subtask dbt_test
+[2025-05-14T22:13:48.497+0000] {logging_mixin.py:154} WARNING - /home/airflow/.local/lib/python3.8/site-packages/airflow/settings.py:195 DeprecationWarning: The sql_alchemy_conn option in [core] has been moved to the sql_alchemy_conn option in [database] - the old setting has been used, but please update your config.
+[2025-05-14T22:13:48.607+0000] {task_command.py:416} INFO - Running <TaskInstance: sample_etl.dbt_test scheduled__2025-05-13T00:00:00+00:00 [running]> on host dd657b0ac9c8
+[2025-05-14T22:13:49.297+0000] {taskinstance.py:1662} INFO - Exporting env vars: AIRFLOW_CTX_DAG_EMAIL='taimourabdulkarim20@gmail.com' AIRFLOW_CTX_DAG_OWNER='airflow' AIRFLOW_CTX_DAG_ID='sample_etl' AIRFLOW_CTX_TASK_ID='dbt_test' AIRFLOW_CTX_EXECUTION_DATE='2025-05-13T00:00:00+00:00' AIRFLOW_CTX_TRY_NUMBER='1' AIRFLOW_CTX_DAG_RUN_ID='scheduled__2025-05-13T00:00:00+00:00'
+[2025-05-14T22:13:49.307+0000] {subprocess.py:63} INFO - Tmp dir root location: /tmp
+[2025-05-14T22:13:49.325+0000] {subprocess.py:75} INFO - Running command: ['/bin/bash', '-c', 'docker exec -i $(docker ps -qf "ancestor=ghcr.io/dbt-labs/dbt-***:1.7.4") dbt test --project-dir /usr/app']
+[2025-05-14T22:13:49.557+0000] {subprocess.py:86} INFO - Output:
+[2025-05-14T22:13:57.065+0000] {subprocess.py:93} INFO - [0m22:13:57  Running with dbt=1.7.4
+[2025-05-14T22:13:57.384+0000] {subprocess.py:93} INFO - [0m22:13:57  Registered adapter: ***=1.7.4
+[2025-05-14T22:13:57.500+0000] {subprocess.py:93} INFO - [0m22:13:57  Found 1 model, 0 sources, 0 exposures, 0 metrics, 401 macros, 0 groups, 0 semantic models
+[2025-05-14T22:13:57.510+0000] {subprocess.py:93} INFO - [0m22:13:57
+[2025-05-14T22:13:57.512+0000] {subprocess.py:93} INFO - [0m22:13:57  Nothing to do. Try checking your model configs and model specification args
+[2025-05-14T22:13:59.236+0000] {subprocess.py:97} INFO - Command exited with return code 0
+[2025-05-14T22:13:59.458+0000] {taskinstance.py:1400} INFO - Marking task as SUCCESS. dag_id=sample_etl, task_id=dbt_test, execution_date=20250513T000000, start_date=20250514T221348, end_date=20250514T221359
+[2025-05-14T22:13:59.532+0000] {local_task_job_runner.py:228} INFO - Task exited with return code 0
+[2025-05-14T22:13:59.597+0000] {taskinstance.py:2778} INFO - 1 downstream tasks scheduled from follow-on schedule check
+[2025-05-14T22:52:50.526+0000] {taskinstance.py:1159} INFO - Dependencies all met for dep_context=non-requeueable deps ti=<TaskInstance: sample_etl.dbt_test scheduled__2025-05-13T00:00:00+00:00 [queued]>
+[2025-05-14T22:52:50.534+0000] {taskinstance.py:1159} INFO - Dependencies all met for dep_context=requeueable deps ti=<TaskInstance: sample_etl.dbt_test scheduled__2025-05-13T00:00:00+00:00 [queued]>
+[2025-05-14T22:52:50.535+0000] {taskinstance.py:1361} INFO - Starting attempt 1 of 3
+[2025-05-14T22:52:50.545+0000] {taskinstance.py:1382} INFO - Executing <Task(BashOperator): dbt_test> on 2025-05-13 00:00:00+00:00
+[2025-05-14T22:52:50.549+0000] {standard_task_runner.py:57} INFO - Started process 416 to run task
+[2025-05-14T22:52:50.552+0000] {standard_task_runner.py:84} INFO - Running: ['airflow', 'tasks', 'run', 'sample_etl', 'dbt_test', 'scheduled__2025-05-13T00:00:00+00:00', '--job-id', '41', '--raw', '--subdir', 'DAGS_FOLDER/sample_etl.py', '--cfg-path', '/tmp/tmpv3o395wb']
+[2025-05-14T22:52:50.555+0000] {standard_task_runner.py:85} INFO - Job 41: Subtask dbt_test
+[2025-05-14T22:52:50.575+0000] {logging_mixin.py:154} WARNING - /home/airflow/.local/lib/python3.8/site-packages/airflow/settings.py:195 DeprecationWarning: The sql_alchemy_conn option in [core] has been moved to the sql_alchemy_conn option in [database] - the old setting has been used, but please update your config.
+[2025-05-14T22:52:50.618+0000] {task_command.py:416} INFO - Running <TaskInstance: sample_etl.dbt_test scheduled__2025-05-13T00:00:00+00:00 [running]> on host dff7001aa755
+[2025-05-14T22:52:50.689+0000] {taskinstance.py:1662} INFO - Exporting env vars: AIRFLOW_CTX_DAG_EMAIL='taimourabdulkarim20@gmail.com' AIRFLOW_CTX_DAG_OWNER='airflow' AIRFLOW_CTX_DAG_ID='sample_etl' AIRFLOW_CTX_TASK_ID='dbt_test' AIRFLOW_CTX_EXECUTION_DATE='2025-05-13T00:00:00+00:00' AIRFLOW_CTX_TRY_NUMBER='1' AIRFLOW_CTX_DAG_RUN_ID='scheduled__2025-05-13T00:00:00+00:00'
+[2025-05-14T22:52:50.692+0000] {subprocess.py:63} INFO - Tmp dir root location: /tmp
+[2025-05-14T22:52:50.694+0000] {subprocess.py:75} INFO - Running command: ['/bin/bash', '-c', 'docker exec -i $(docker ps -qf "ancestor=ghcr.io/dbt-labs/dbt-***:1.7.4") dbt test --project-dir /usr/app']
+[2025-05-14T22:52:50.706+0000] {subprocess.py:86} INFO - Output:
+[2025-05-14T22:52:53.531+0000] {subprocess.py:93} INFO - [0m22:52:53  Running with dbt=1.7.4
+[2025-05-14T22:52:53.890+0000] {subprocess.py:93} INFO - [0m22:52:53  Registered adapter: ***=1.7.4
+[2025-05-14T22:52:53.955+0000] {subprocess.py:93} INFO - [0m22:52:53  Found 1 model, 0 sources, 0 exposures, 0 metrics, 401 macros, 0 groups, 0 semantic models
+[2025-05-14T22:52:53.964+0000] {subprocess.py:93} INFO - [0m22:52:53
+[2025-05-14T22:52:53.964+0000] {subprocess.py:93} INFO - [0m22:52:53  Nothing to do. Try checking your model configs and model specification args
+[2025-05-14T22:52:55.356+0000] {subprocess.py:97} INFO - Command exited with return code 0
+[2025-05-14T22:52:55.441+0000] {taskinstance.py:1400} INFO - Marking task as SUCCESS. dag_id=sample_etl, task_id=dbt_test, execution_date=20250513T000000, start_date=20250514T225250, end_date=20250514T225255
+[2025-05-14T22:52:55.504+0000] {local_task_job_runner.py:228} INFO - Task exited with return code 0
+[2025-05-14T22:52:55.564+0000] {taskinstance.py:2778} INFO - 1 downstream tasks scheduled from follow-on schedule check

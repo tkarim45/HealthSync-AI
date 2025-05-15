@@ -1,0 +1,12 @@
+name: "healthsync_dbt"
+version: "1.0"
+config-version: 2
+
+profile: "healthsync_dbt"
+
+model-paths: ["healthsync_dbt/models"]
+
+target-path: "target"
+clean-targets:
+  - "target"
+  - "dbt_modules"

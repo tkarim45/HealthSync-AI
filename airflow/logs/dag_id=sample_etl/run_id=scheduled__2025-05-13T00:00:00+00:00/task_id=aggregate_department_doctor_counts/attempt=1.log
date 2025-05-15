@@ -1,0 +1,114 @@
+[2025-05-14T19:24:00.575+0000] {taskinstance.py:1159} INFO - Dependencies all met for dep_context=non-requeueable deps ti=<TaskInstance: sample_etl.aggregate_department_doctor_counts scheduled__2025-05-13T00:00:00+00:00 [queued]>
+[2025-05-14T19:24:00.584+0000] {taskinstance.py:1159} INFO - Dependencies all met for dep_context=requeueable deps ti=<TaskInstance: sample_etl.aggregate_department_doctor_counts scheduled__2025-05-13T00:00:00+00:00 [queued]>
+[2025-05-14T19:24:00.585+0000] {taskinstance.py:1361} INFO - Starting attempt 1 of 3
+[2025-05-14T19:24:00.596+0000] {taskinstance.py:1382} INFO - Executing <Task(PostgresOperator): aggregate_department_doctor_counts> on 2025-05-13 00:00:00+00:00
+[2025-05-14T19:24:00.601+0000] {standard_task_runner.py:57} INFO - Started process 235 to run task
+[2025-05-14T19:24:00.605+0000] {standard_task_runner.py:84} INFO - Running: ['airflow', 'tasks', 'run', 'sample_etl', 'aggregate_department_doctor_counts', 'scheduled__2025-05-13T00:00:00+00:00', '--job-id', '107', '--raw', '--subdir', 'DAGS_FOLDER/sample_etl.py', '--cfg-path', '/tmp/tmpzss1ctbt']
+[2025-05-14T19:24:00.607+0000] {standard_task_runner.py:85} INFO - Job 107: Subtask aggregate_department_doctor_counts
+[2025-05-14T19:24:00.628+0000] {logging_mixin.py:154} WARNING - /home/airflow/.local/lib/python3.8/site-packages/airflow/settings.py:195 DeprecationWarning: The sql_alchemy_conn option in [core] has been moved to the sql_alchemy_conn option in [database] - the old setting has been used, but please update your config.
+[2025-05-14T19:24:00.671+0000] {task_command.py:416} INFO - Running <TaskInstance: sample_etl.aggregate_department_doctor_counts scheduled__2025-05-13T00:00:00+00:00 [running]> on host 3dfadb756915
+[2025-05-14T19:24:00.793+0000] {taskinstance.py:1662} INFO - Exporting env vars: AIRFLOW_CTX_DAG_EMAIL='taimourabdulkarim20@gmail.com' AIRFLOW_CTX_DAG_OWNER='airflow' AIRFLOW_CTX_DAG_ID='sample_etl' AIRFLOW_CTX_TASK_ID='aggregate_department_doctor_counts' AIRFLOW_CTX_EXECUTION_DATE='2025-05-13T00:00:00+00:00' AIRFLOW_CTX_TRY_NUMBER='1' AIRFLOW_CTX_DAG_RUN_ID='scheduled__2025-05-13T00:00:00+00:00'
+[2025-05-14T19:24:00.795+0000] {sql.py:274} INFO - Executing: 
+            INSERT INTO department_doctor_counts (stat_date, department_id, doctor_count)
+            SELECT
+                CURRENT_DATE,
+                department_id,
+                COUNT(*)
+            FROM doctors
+            GROUP BY department_id
+            ON CONFLICT (stat_date, department_id) DO UPDATE
+            SET doctor_count = EXCLUDED.doctor_count;
+        
+[2025-05-14T19:24:00.849+0000] {base.py:73} INFO - Using connection ID '***_default' for task execution.
+[2025-05-14T19:24:00.873+0000] {base.py:73} INFO - Using connection ID '***_default' for task execution.
+[2025-05-14T19:24:00.897+0000] {sql.py:418} INFO - Running statement: 
+            INSERT INTO department_doctor_counts (stat_date, department_id, doctor_count)
+            SELECT
+                CURRENT_DATE,
+                department_id,
+                COUNT(*)
+            FROM doctors
+            GROUP BY department_id
+            ON CONFLICT (stat_date, department_id) DO UPDATE
+            SET doctor_count = EXCLUDED.doctor_count;
+        , parameters: None
+[2025-05-14T19:24:00.902+0000] {sql.py:427} INFO - Rows affected: 15
+[2025-05-14T19:24:00.926+0000] {taskinstance.py:1400} INFO - Marking task as SUCCESS. dag_id=sample_etl, task_id=aggregate_department_doctor_counts, execution_date=20250513T000000, start_date=20250514T192400, end_date=20250514T192400
+[2025-05-14T19:24:00.952+0000] {local_task_job_runner.py:228} INFO - Task exited with return code 0
+[2025-05-14T19:24:00.983+0000] {taskinstance.py:2778} INFO - 1 downstream tasks scheduled from follow-on schedule check
+[2025-05-14T22:13:38.659+0000] {taskinstance.py:1159} INFO - Dependencies all met for dep_context=non-requeueable deps ti=<TaskInstance: sample_etl.aggregate_department_doctor_counts scheduled__2025-05-13T00:00:00+00:00 [queued]>
+[2025-05-14T22:13:38.668+0000] {taskinstance.py:1159} INFO - Dependencies all met for dep_context=requeueable deps ti=<TaskInstance: sample_etl.aggregate_department_doctor_counts scheduled__2025-05-13T00:00:00+00:00 [queued]>
+[2025-05-14T22:13:38.668+0000] {taskinstance.py:1361} INFO - Starting attempt 1 of 3
+[2025-05-14T22:13:38.680+0000] {taskinstance.py:1382} INFO - Executing <Task(PostgresOperator): aggregate_department_doctor_counts> on 2025-05-13 00:00:00+00:00
+[2025-05-14T22:13:38.684+0000] {standard_task_runner.py:57} INFO - Started process 544 to run task
+[2025-05-14T22:13:38.688+0000] {standard_task_runner.py:84} INFO - Running: ['airflow', 'tasks', 'run', 'sample_etl', 'aggregate_department_doctor_counts', 'scheduled__2025-05-13T00:00:00+00:00', '--job-id', '79', '--raw', '--subdir', 'DAGS_FOLDER/sample_etl.py', '--cfg-path', '/tmp/tmp_dm9ma5v']
+[2025-05-14T22:13:38.691+0000] {standard_task_runner.py:85} INFO - Job 79: Subtask aggregate_department_doctor_counts
+[2025-05-14T22:13:38.711+0000] {logging_mixin.py:154} WARNING - /home/airflow/.local/lib/python3.8/site-packages/airflow/settings.py:195 DeprecationWarning: The sql_alchemy_conn option in [core] has been moved to the sql_alchemy_conn option in [database] - the old setting has been used, but please update your config.
+[2025-05-14T22:13:38.746+0000] {task_command.py:416} INFO - Running <TaskInstance: sample_etl.aggregate_department_doctor_counts scheduled__2025-05-13T00:00:00+00:00 [running]> on host dd657b0ac9c8
+[2025-05-14T22:13:38.821+0000] {taskinstance.py:1662} INFO - Exporting env vars: AIRFLOW_CTX_DAG_EMAIL='taimourabdulkarim20@gmail.com' AIRFLOW_CTX_DAG_OWNER='airflow' AIRFLOW_CTX_DAG_ID='sample_etl' AIRFLOW_CTX_TASK_ID='aggregate_department_doctor_counts' AIRFLOW_CTX_EXECUTION_DATE='2025-05-13T00:00:00+00:00' AIRFLOW_CTX_TRY_NUMBER='1' AIRFLOW_CTX_DAG_RUN_ID='scheduled__2025-05-13T00:00:00+00:00'
+[2025-05-14T22:13:38.822+0000] {sql.py:274} INFO - Executing: 
+            INSERT INTO department_doctor_counts (stat_date, department_id, doctor_count)
+            SELECT
+                CURRENT_DATE,
+                department_id,
+                COUNT(*)
+            FROM doctors
+            GROUP BY department_id
+            ON CONFLICT (stat_date, department_id) DO UPDATE
+            SET doctor_count = EXCLUDED.doctor_count;
+        
+[2025-05-14T22:13:38.842+0000] {base.py:73} INFO - Using connection ID '***_default' for task execution.
+[2025-05-14T22:13:38.845+0000] {base.py:73} INFO - Using connection ID '***_default' for task execution.
+[2025-05-14T22:13:38.853+0000] {sql.py:418} INFO - Running statement: 
+            INSERT INTO department_doctor_counts (stat_date, department_id, doctor_count)
+            SELECT
+                CURRENT_DATE,
+                department_id,
+                COUNT(*)
+            FROM doctors
+            GROUP BY department_id
+            ON CONFLICT (stat_date, department_id) DO UPDATE
+            SET doctor_count = EXCLUDED.doctor_count;
+        , parameters: None
+[2025-05-14T22:13:38.855+0000] {sql.py:427} INFO - Rows affected: 25
+[2025-05-14T22:13:38.866+0000] {taskinstance.py:1400} INFO - Marking task as SUCCESS. dag_id=sample_etl, task_id=aggregate_department_doctor_counts, execution_date=20250513T000000, start_date=20250514T221338, end_date=20250514T221338
+[2025-05-14T22:13:38.915+0000] {local_task_job_runner.py:228} INFO - Task exited with return code 0
+[2025-05-14T22:13:38.951+0000] {taskinstance.py:2778} INFO - 1 downstream tasks scheduled from follow-on schedule check
+[2025-05-14T22:52:41.528+0000] {taskinstance.py:1159} INFO - Dependencies all met for dep_context=non-requeueable deps ti=<TaskInstance: sample_etl.aggregate_department_doctor_counts scheduled__2025-05-13T00:00:00+00:00 [queued]>
+[2025-05-14T22:52:41.536+0000] {taskinstance.py:1159} INFO - Dependencies all met for dep_context=requeueable deps ti=<TaskInstance: sample_etl.aggregate_department_doctor_counts scheduled__2025-05-13T00:00:00+00:00 [queued]>
+[2025-05-14T22:52:41.537+0000] {taskinstance.py:1361} INFO - Starting attempt 1 of 3
+[2025-05-14T22:52:41.548+0000] {taskinstance.py:1382} INFO - Executing <Task(PostgresOperator): aggregate_department_doctor_counts> on 2025-05-13 00:00:00+00:00
+[2025-05-14T22:52:41.553+0000] {standard_task_runner.py:57} INFO - Started process 392 to run task
+[2025-05-14T22:52:41.557+0000] {standard_task_runner.py:84} INFO - Running: ['airflow', 'tasks', 'run', 'sample_etl', 'aggregate_department_doctor_counts', 'scheduled__2025-05-13T00:00:00+00:00', '--job-id', '39', '--raw', '--subdir', 'DAGS_FOLDER/sample_etl.py', '--cfg-path', '/tmp/tmp74t5phap']
+[2025-05-14T22:52:41.559+0000] {standard_task_runner.py:85} INFO - Job 39: Subtask aggregate_department_doctor_counts
+[2025-05-14T22:52:41.575+0000] {logging_mixin.py:154} WARNING - /home/airflow/.local/lib/python3.8/site-packages/airflow/settings.py:195 DeprecationWarning: The sql_alchemy_conn option in [core] has been moved to the sql_alchemy_conn option in [database] - the old setting has been used, but please update your config.
+[2025-05-14T22:52:41.612+0000] {task_command.py:416} INFO - Running <TaskInstance: sample_etl.aggregate_department_doctor_counts scheduled__2025-05-13T00:00:00+00:00 [running]> on host dff7001aa755
+[2025-05-14T22:52:41.692+0000] {taskinstance.py:1662} INFO - Exporting env vars: AIRFLOW_CTX_DAG_EMAIL='taimourabdulkarim20@gmail.com' AIRFLOW_CTX_DAG_OWNER='airflow' AIRFLOW_CTX_DAG_ID='sample_etl' AIRFLOW_CTX_TASK_ID='aggregate_department_doctor_counts' AIRFLOW_CTX_EXECUTION_DATE='2025-05-13T00:00:00+00:00' AIRFLOW_CTX_TRY_NUMBER='1' AIRFLOW_CTX_DAG_RUN_ID='scheduled__2025-05-13T00:00:00+00:00'
+[2025-05-14T22:52:41.693+0000] {sql.py:274} INFO - Executing: 
+            INSERT INTO department_doctor_counts (stat_date, department_id, doctor_count)
+            SELECT
+                CURRENT_DATE,
+                department_id,
+                COUNT(*)
+            FROM doctors
+            GROUP BY department_id
+            ON CONFLICT (stat_date, department_id) DO UPDATE
+            SET doctor_count = EXCLUDED.doctor_count;
+        
+[2025-05-14T22:52:41.726+0000] {base.py:73} INFO - Using connection ID '***_default' for task execution.
+[2025-05-14T22:52:41.733+0000] {base.py:73} INFO - Using connection ID '***_default' for task execution.
+[2025-05-14T22:52:41.743+0000] {sql.py:418} INFO - Running statement: 
+            INSERT INTO department_doctor_counts (stat_date, department_id, doctor_count)
+            SELECT
+                CURRENT_DATE,
+                department_id,
+                COUNT(*)
+            FROM doctors
+            GROUP BY department_id
+            ON CONFLICT (stat_date, department_id) DO UPDATE
+            SET doctor_count = EXCLUDED.doctor_count;
+        , parameters: None
+[2025-05-14T22:52:41.745+0000] {sql.py:427} INFO - Rows affected: 15
+[2025-05-14T22:52:41.757+0000] {taskinstance.py:1400} INFO - Marking task as SUCCESS. dag_id=sample_etl, task_id=aggregate_department_doctor_counts, execution_date=20250513T000000, start_date=20250514T225241, end_date=20250514T225241
+[2025-05-14T22:52:41.780+0000] {local_task_job_runner.py:228} INFO - Task exited with return code 0
+[2025-05-14T22:52:41.810+0000] {taskinstance.py:2778} INFO - 1 downstream tasks scheduled from follow-on schedule check

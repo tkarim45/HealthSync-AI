@@ -1,14 +1,20 @@
 import psycopg2
 import uuid
-from datetime import datetime
-from passlib.context import CryptContext
-from config.settings import settings
+from datetime import datetime, timedelta
+import random
 import logging
+from faker import Faker
+from config.settings import settings  # Adjust import based on your project structure
 
+# Configure logging
 logger = logging.getLogger(__name__)
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+logging.basicConfig(level=logging.INFO)
+
+# Initialize Faker for realistic data
+fake = Faker()
 
 
+# Database connection
 def get_db_connection():
     return psycopg2.connect(
         dbname=settings.DB_NAME,
@@ -19,192 +25,390 @@ def get_db_connection():
     )
 
 
-def populate_dummy_data():
+# Helper function to generate random time slots
+def generate_time_slot():
+    hours = random.randint(9, 17)  # 9 AM to 5 PM
+    minutes = random.choice([0, 30])
+    start_time = f"{hours:02d}:{minutes:02d}"
+    end_hour = hours + (1 if minutes == 30 else 0)
+    end_minutes = (minutes + 30) % 60
+    end_time = f"{end_hour:02d}:{end_minutes:02d}"
+    return start_time, end_time
+
+
+# Create aggregated tables (matching etl_pipeline.py)
+def create_aggregated_tables(conn):
+    c = conn.cursor()
+    # User stats table
+    c.execute(
+        """
+        CREATE TABLE IF NOT EXISTS user_stats (
+            stat_date DATE PRIMARY KEY,
+            total_users INT,
+            new_users INT
+        );
+        """
+    )
+    # Doctor specialty counts table
+    c.execute(
+        """
+        CREATE TABLE IF NOT EXISTS doctor_specialty_counts (
+            stat_date DATE,
+            specialty TEXT,
+            doctor_count INT,
+            PRIMARY KEY (stat_date, specialty)
+        );
+        """
+    )
+    # Appointment stats table
+    c.execute(
+        """
+        CREATE TABLE IF NOT EXISTS appointment_stats (
+            stat_date DATE PRIMARY KEY,
+            total_appointments INT,
+            avg_appointments_per_doctor FLOAT
+        );
+        """
+    )
+    # Weekly signups table
+    c.execute(
+        """
+        CREATE TABLE IF NOT EXISTS weekly_signups (
+            week_start DATE PRIMARY KEY,
+            user_signups INT
+        );
+        """
+    )
+    # Hospital stats table
+    c.execute(
+        """
+        CREATE TABLE IF NOT EXISTS hospital_stats (
+            stat_date DATE PRIMARY KEY,
+            total_hospitals INT,
+            total_departments INT
+        );
+        """
+    )
+    # Department doctor counts table
+    c.execute(
+        """
+        CREATE TABLE IF NOT EXISTS department_doctor_counts (
+            stat_date DATE,
+            department_id UUID,
+            doctor_count INT,
+            PRIMARY KEY (stat_date, department_id)
+        );
+        """
+    )
+    conn.commit()
+    logger.info("Aggregated tables created or verified")
+
+
+# Populate foundational tables
+def populate_foundational_data():
     conn = get_db_connection()
     c = conn.cursor()
-    now = datetime.utcnow()
 
-    # Open the password file for writing (overwrite each run)
-    password_file_path = "dummy_passwords.txt"
-    password_file = open(password_file_path, "w")
-    password_file.write("username,email,password,role\n")
+    # 1. Populate users (patients, doctors, admins)
+    users = []
+    user_roles = [("patient", 50), ("doctor", 20), ("admin", 5)]
+    for role, count in user_roles:
+        for _ in range(count):
+            user_id = str(uuid.uuid4())
+            username = fake.user_name()
+            email = fake.email()
+            password = fake.password()
+            created_at = fake.date_time_between(start_date="-90d", end_date="now")
+            users.append((user_id, username, email, password, role, created_at))
+    c.executemany(
+        """
+        INSERT INTO users (id, username, email, password, role, created_at)
+        VALUES (%s, %s, %s, %s, %s, %s)
+        ON CONFLICT DO NOTHING
+        """,
+        users,
+    )
+    logger.info(f"Inserted {len(users)} users")
 
-    # 1. Super Admin
-    super_admin_id = str(uuid.uuid4())
-    try:
-        c.execute("SELECT id FROM users WHERE username = %s", ("superadmin",))
-        if not c.fetchone():
-            password = "superadmin"
-            c.execute(
-                """
-                INSERT INTO users (id, username, email, password, role, created_at)
-                VALUES (%s, %s, %s, %s, %s, %s)
-                """,
-                (
-                    super_admin_id,
-                    "superadmin",
-                    "superadmin@gmail.com",
-                    pwd_context.hash(password),
-                    "super_admin",
-                    now,
-                ),
-            )
-            password_file.write(
-                f"superadmin,superadmin@gmail.com,{password},super_admin\n"
-            )
-            logger.info("Super admin created.")
-    except Exception as e:
-        logger.error(f"Super admin error: {e}")
-
-    # 2. Hospitals
-    hospital_ids = []
-    for i in range(5):
+    # 2. Populate hospitals
+    hospitals = []
+    for _ in range(5):
         hospital_id = str(uuid.uuid4())
-        hospital_ids.append(hospital_id)
-        name = f"Hospital_{i+1}"
-        address = f"{100+i} Main St, City"
-        lat = 30.0 + i
-        lng = 70.0 + i
-        try:
-            c.execute("SELECT id FROM hospitals WHERE name = %s", (name,))
-            if not c.fetchone():
-                c.execute(
-                    """
-                    INSERT INTO hospitals (id, name, address, lat, lng, created_at)
-                    VALUES (%s, %s, %s, %s, %s, %s)
-                    """,
-                    (hospital_id, name, address, lat, lng, now),
-                )
-                logger.info(f"Hospital {name} created.")
-        except Exception as e:
-            logger.error(f"Hospital error: {e}")
+        name = fake.company() + " Hospital"
+        address = fake.address()
+        lat = fake.latitude()
+        lng = fake.longitude()
+        created_at = fake.date_time_between(start_date="-90d", end_date="now")
+        hospitals.append((hospital_id, name, address, lat, lng, created_at))
+    c.executemany(
+        """
+        INSERT INTO hospitals (id, name, address, lat, lng, created_at)
+        VALUES (%s, %s, %s, %s, %s, %s)
+        ON CONFLICT DO NOTHING
+        """,
+        hospitals,
+    )
+    logger.info(f"Inserted {len(hospitals)} hospitals")
 
-    # 3. Admins (one per hospital)
-    admin_ids = []
-    for i, hospital_id in enumerate(hospital_ids):
-        admin_id = str(uuid.uuid4())
-        admin_ids.append(admin_id)
-        username = f"admin{i+1}"
-        email = f"admin{i+1}@gmail.com"
-        try:
-            c.execute("SELECT id FROM users WHERE username = %s", (username,))
-            if not c.fetchone():
-                password = "admin"
-                c.execute(
-                    """
-                    INSERT INTO users (id, username, email, password, role, created_at)
-                    VALUES (%s, %s, %s, %s, %s, %s)
-                    """,
-                    (
-                        admin_id,
-                        username,
-                        email,
-                        pwd_context.hash(password),
-                        "admin",
-                        now,
-                    ),
-                )
-                password_file.write(f"{username},{email},{password},admin\n")
-                logger.info(f"Admin {username} created.")
-            # Assign admin to hospital
-            c.execute(
-                "SELECT * FROM hospital_admins WHERE hospital_id = %s AND user_id = %s",
-                (hospital_id, admin_id),
+    # 3. Populate hospital_admins
+    c.execute("SELECT id FROM users WHERE role = 'admin'")
+    admin_ids = [row[0] for row in c.fetchall()]
+    c.execute("SELECT id FROM hospitals")
+    hospital_ids = [row[0] for row in c.fetchall()]
+    hospital_admins = []
+    for admin_id in admin_ids:
+        hospital_id = random.choice(hospital_ids)
+        assigned_at = datetime.utcnow()
+        hospital_admins.append((hospital_id, admin_id, assigned_at))
+    c.executemany(
+        """
+        INSERT INTO hospital_admins (hospital_id, user_id, assigned_at)
+        VALUES (%s, %s, %s)
+        ON CONFLICT DO NOTHING
+        """,
+        hospital_admins,
+    )
+    logger.info(f"Inserted {len(hospital_admins)} hospital_admins")
+
+    # 4. Populate departments
+    departments = []
+    department_names = [
+        "Cardiology",
+        "Neurology",
+        "Pediatrics",
+        "Orthopedics",
+        "Oncology",
+    ]
+    for hospital_id in hospital_ids:
+        for name in department_names:
+            department_id = str(uuid.uuid4())
+            departments.append((department_id, hospital_id, name))
+    c.executemany(
+        """
+        INSERT INTO departments (id, hospital_id, name)
+        VALUES (%s, %s, %s)
+        ON CONFLICT DO NOTHING
+        """,
+        departments,
+    )
+    logger.info(f"Inserted {len(departments)} departments")
+
+    # 5. Populate doctors
+    c.execute("SELECT id FROM users WHERE role = 'doctor'")
+    doctor_ids = [row[0] for row in c.fetchall()]
+    c.execute("SELECT id FROM departments")
+    department_ids = [row[0] for row in c.fetchall()]
+    specialties = [
+        "Cardiologist",
+        "Neurologist",
+        "Pediatrician",
+        "Orthopedist",
+        "Oncologist",
+    ]
+    doctors = []
+    for doctor_id in doctor_ids:
+        department_id = random.choice(department_ids)
+        specialty = random.choice(specialties)
+        title = f"Dr. {fake.last_name()}"
+        phone = fake.phone_number()
+        bio = fake.text(max_nb_chars=200)
+        doctors.append((doctor_id, department_id, specialty, title, phone, bio))
+    c.executemany(
+        """
+        INSERT INTO doctors (user_id, department_id, specialty, title, phone, bio)
+        VALUES (%s, %s, %s, %s, %s, %s)
+        ON CONFLICT DO NOTHING
+        """,
+        doctors,
+    )
+    logger.info(f"Inserted {len(doctors)} doctors")
+
+    # 6. Populate appointments
+    c.execute("SELECT id FROM users WHERE role = 'patient'")
+    patient_ids = [row[0] for row in c.fetchall()]
+    c.execute("SELECT user_id, department_id FROM doctors")
+    doctor_depts = c.fetchall()
+    c.execute("SELECT id FROM hospitals")
+    hospital_ids = [row[0] for row in c.fetchall()]
+    appointments = []
+    statuses = ["scheduled", "completed", "cancelled"]
+    start_date = datetime.now() - timedelta(days=90)
+    for _ in range(200):
+        appointment_id = str(uuid.uuid4())
+        user_id = random.choice(patient_ids)
+        doctor_id, department_id = random.choice(doctor_depts)
+        hospital_id = random.choice(hospital_ids)
+        appt_date = fake.date_between(start_date=start_date, end_date="now")
+        start_time, end_time = generate_time_slot()
+        status = random.choices(statuses, weights=[70, 20, 10], k=1)[0]
+        created_at = fake.date_time_between(start_date=start_date, end_date="now")
+        appointments.append(
+            (
+                appointment_id,
+                user_id,
+                doctor_id,
+                department_id,
+                hospital_id,
+                appt_date.strftime("%Y-%m-%d"),
+                start_time,
+                end_time,
+                status,
+                created_at,
             )
-            if not c.fetchone():
-                c.execute(
-                    """
-                    INSERT INTO hospital_admins (hospital_id, user_id, assigned_at)
-                    VALUES (%s, %s, %s)
-                    """,
-                    (hospital_id, admin_id, now),
-                )
-                logger.info(f"Admin {username} assigned to {hospital_id}.")
-        except Exception as e:
-            logger.error(f"Admin error: {e}")
-
-    # 4. Departments (3 per hospital)
-    department_ids = []
-    department_names = ["Cardiology", "Dermatology", "Neurology"]
-    for i, hospital_id in enumerate(hospital_ids):
-        for dept_name in department_names:
-            dept_id = str(uuid.uuid4())
-            department_ids.append((dept_id, hospital_id, dept_name))
-            try:
-                c.execute(
-                    "SELECT id FROM departments WHERE name = %s AND hospital_id = %s",
-                    (dept_name, hospital_id),
-                )
-                if not c.fetchone():
-                    c.execute(
-                        """
-                        INSERT INTO departments (id, hospital_id, name)
-                        VALUES (%s, %s, %s)
-                        """,
-                        (dept_id, hospital_id, dept_name),
-                    )
-                    logger.info(
-                        f"Department {dept_name} created in hospital {hospital_id}."
-                    )
-            except Exception as e:
-                logger.error(f"Department error: {e}")
-
-    # 5. Doctors (2 per department)
-    for dept_id, hospital_id, dept_name in department_ids:
-        for j in range(2):
-            doctor_id = str(uuid.uuid4())
-            username = f"doctor_{dept_name.lower()}_{j+1}_{hospital_id[:4]}"
-            email = f"{username}@gmail.com"
-            try:
-                c.execute("SELECT id FROM users WHERE username = %s", (username,))
-                if not c.fetchone():
-                    password = "doctor"
-                    c.execute(
-                        """
-                        INSERT INTO users (id, username, email, password, role, created_at)
-                        VALUES (%s, %s, %s, %s, %s, %s)
-                        """,
-                        (
-                            doctor_id,
-                            username,
-                            email,
-                            pwd_context.hash(password),
-                            "doctor",
-                            now,
-                        ),
-                    )
-                    password_file.write(f"{username},{email},{password},doctor\n")
-                    logger.info(f"Doctor {username} created.")
-                # Insert into doctors table
-                c.execute(
-                    "SELECT * FROM doctors WHERE user_id = %s AND department_id = %s",
-                    (doctor_id, dept_id),
-                )
-                if not c.fetchone():
-                    c.execute(
-                        """
-                        INSERT INTO doctors (user_id, department_id, specialty, title, phone, bio)
-                        VALUES (%s, %s, %s, %s, %s, %s)
-                        """,
-                        (
-                            doctor_id,
-                            dept_id,
-                            f"Specialty {dept_name}",
-                            f"Dr. {username.title()}",
-                            f"+1234567890{j}",
-                            f"Bio for {username}",
-                        ),
-                    )
-                    logger.info(
-                        f"Doctor {username} assigned to department {dept_name}."
-                    )
-            except Exception as e:
-                logger.error(f"Doctor error: {e}")
+        )
+    c.executemany(
+        """
+        INSERT INTO appointments (id, user_id, doctor_id, department_id, hospital_id, appointment_date, start_time, end_time, status, created_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT DO NOTHING
+        """,
+        appointments,
+    )
+    logger.info(f"Inserted {len(appointments)} appointments")
 
     conn.commit()
     conn.close()
-    password_file.close()
-    logger.info("Dummy data population complete.")
+
+
+# Populate aggregated tables
+def populate_aggregated_data():
+    conn = get_db_connection()
+    # Create aggregated tables
+    create_aggregated_tables(conn)
+    c = conn.cursor()
+
+    # Generate data for the past 90 days
+    start_date = datetime.now().date() - timedelta(days=90)
+    end_date = datetime.now().date()
+    current_date = start_date
+
+    while current_date <= end_date:
+        try:
+            # 1. user_stats
+            c.execute(
+                """
+                SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE created_at::date = %s) AS new
+                FROM users
+                WHERE created_at::date <= %s
+                """,
+                (current_date, current_date),
+            )
+            total_users, new_users = c.fetchone()
+            c.execute(
+                """
+                INSERT INTO user_stats (stat_date, total_users, new_users)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (stat_date) DO UPDATE
+                SET total_users = EXCLUDED.total_users, new_users = EXCLUDED.new_users
+                """,
+                (current_date, total_users, new_users),
+            )
+
+            # 2. doctor_specialty_counts
+            c.execute("SELECT specialty, COUNT(*) FROM doctors GROUP BY specialty")
+            specialty_counts = c.fetchall()
+            for specialty, count in specialty_counts:
+                c.execute(
+                    """
+                    INSERT INTO doctor_specialty_counts (stat_date, specialty, doctor_count)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (stat_date, specialty) DO UPDATE
+                    SET doctor_count = EXCLUDED.doctor_count
+                    """,
+                    (current_date, specialty, count),
+                )
+
+            # 3. appointment_stats
+            c.execute(
+                """
+                SELECT COUNT(*) AS total,
+                       COUNT(*)::float / NULLIF((SELECT COUNT(*) FROM users WHERE role = 'doctor'), 0) AS avg
+                FROM appointments
+                WHERE appointment_date::date = %s
+                """,
+                (current_date,),
+            )
+            total_appts, avg_appts = c.fetchone()
+            c.execute(
+                """
+                INSERT INTO appointment_stats (stat_date, total_appointments, avg_appointments_per_doctor)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (stat_date) DO UPDATE
+                SET total_appointments = EXCLUDED.total_appointments,
+                    avg_appointments_per_doctor = EXCLUDED.avg_appointments_per_doctor
+                """,
+                (current_date, total_appts, avg_appts),
+            )
+
+            # 4. weekly_signups
+            week_start = current_date - timedelta(days=current_date.weekday())
+            c.execute(
+                """
+                SELECT COUNT(*) 
+                FROM users 
+                WHERE created_at::date >= %s AND created_at::date < %s + INTERVAL '7 days'
+                """,
+                (week_start, week_start),
+            )
+            user_signups = c.fetchone()[0]
+            c.execute(
+                """
+                INSERT INTO weekly_signups (week_start, user_signups)
+                VALUES (%s, %s)
+                ON CONFLICT (week_start) DO UPDATE
+                SET user_signups = EXCLUDED.user_signups
+                """,
+                (week_start, user_signups),
+            )
+
+            # 5. hospital_stats
+            c.execute("SELECT COUNT(*) FROM hospitals")
+            total_hospitals = c.fetchone()[0]
+            c.execute("SELECT COUNT(*) FROM departments")
+            total_departments = c.fetchone()[0]
+            c.execute(
+                """
+                INSERT INTO hospital_stats (stat_date, total_hospitals, total_departments)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (stat_date) DO UPDATE
+                SET total_hospitals = EXCLUDED.total_hospitals,
+                    total_departments = EXCLUDED.total_departments
+                """,
+                (current_date, total_hospitals, total_departments),
+            )
+
+            # 6. department_doctor_counts
+            c.execute(
+                "SELECT department_id, COUNT(*) FROM doctors GROUP BY department_id"
+            )
+            dept_counts = c.fetchall()
+            for dept_id, count in dept_counts:
+                c.execute(
+                    """
+                    INSERT INTO department_doctor_counts (stat_date, department_id, doctor_count)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (stat_date, department_id) DO UPDATE
+                    SET doctor_count = EXCLUDED.doctor_count
+                    """,
+                    (current_date, dept_id, count),
+                )
+
+            conn.commit()
+        except psycopg2.Error as e:
+            logger.error(f"Error on {current_date}: {str(e)}")
+            conn.rollback()
+            raise
+        current_date += timedelta(days=1)
+
+    conn.close()
+    logger.info("Inserted aggregated data for all tables")
+
+
+def populate_dummy_data():
+    logger.info("Starting dummy data population")
+    populate_foundational_data()
+    populate_aggregated_data()
+    logger.info("Dummy data population completed")
 
 
 if __name__ == "__main__":

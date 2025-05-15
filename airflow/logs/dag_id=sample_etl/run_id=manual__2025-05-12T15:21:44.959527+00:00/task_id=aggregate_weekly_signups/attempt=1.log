@@ -1,0 +1,38 @@
+[2025-05-12T15:26:31.650+0000] {taskinstance.py:1159} INFO - Dependencies all met for dep_context=non-requeueable deps ti=<TaskInstance: sample_etl.aggregate_weekly_signups manual__2025-05-12T15:21:44.959527+00:00 [queued]>
+[2025-05-12T15:26:31.657+0000] {taskinstance.py:1159} INFO - Dependencies all met for dep_context=requeueable deps ti=<TaskInstance: sample_etl.aggregate_weekly_signups manual__2025-05-12T15:21:44.959527+00:00 [queued]>
+[2025-05-12T15:26:31.658+0000] {taskinstance.py:1361} INFO - Starting attempt 1 of 3
+[2025-05-12T15:26:31.667+0000] {taskinstance.py:1382} INFO - Executing <Task(PostgresOperator): aggregate_weekly_signups> on 2025-05-12 15:21:44.959527+00:00
+[2025-05-12T15:26:31.672+0000] {standard_task_runner.py:57} INFO - Started process 240 to run task
+[2025-05-12T15:26:31.676+0000] {standard_task_runner.py:84} INFO - Running: ['airflow', 'tasks', 'run', 'sample_etl', 'aggregate_weekly_signups', 'manual__2025-05-12T15:21:44.959527+00:00', '--job-id', '81', '--raw', '--subdir', 'DAGS_FOLDER/sample_etl.py', '--cfg-path', '/tmp/tmpoy3_ulby']
+[2025-05-12T15:26:31.678+0000] {standard_task_runner.py:85} INFO - Job 81: Subtask aggregate_weekly_signups
+[2025-05-12T15:26:31.694+0000] {logging_mixin.py:154} WARNING - /home/airflow/.local/lib/python3.8/site-packages/airflow/settings.py:195 DeprecationWarning: The sql_alchemy_conn option in [core] has been moved to the sql_alchemy_conn option in [database] - the old setting has been used, but please update your config.
+[2025-05-12T15:26:31.724+0000] {task_command.py:416} INFO - Running <TaskInstance: sample_etl.aggregate_weekly_signups manual__2025-05-12T15:21:44.959527+00:00 [running]> on host a601936fee7b
+[2025-05-12T15:26:31.794+0000] {taskinstance.py:1662} INFO - Exporting env vars: AIRFLOW_CTX_DAG_EMAIL='taimourabdulkarim20@gmail.com' AIRFLOW_CTX_DAG_OWNER='airflow' AIRFLOW_CTX_DAG_ID='sample_etl' AIRFLOW_CTX_TASK_ID='aggregate_weekly_signups' AIRFLOW_CTX_EXECUTION_DATE='2025-05-12T15:21:44.959527+00:00' AIRFLOW_CTX_TRY_NUMBER='1' AIRFLOW_CTX_DAG_RUN_ID='manual__2025-05-12T15:21:44.959527+00:00'
+[2025-05-12T15:26:31.794+0000] {sql.py:274} INFO - Executing: 
+            INSERT INTO weekly_signups (week_start, user_signups)
+            SELECT
+                date_trunc('week', CURRENT_DATE)::date AS week_start,
+                COUNT(*)
+            FROM users
+            WHERE created_at >= date_trunc('week', CURRENT_DATE)
+            AND created_at < date_trunc('week', CURRENT_DATE) + INTERVAL '7 days'
+            ON CONFLICT (week_start) DO UPDATE
+            SET user_signups = EXCLUDED.user_signups;
+        
+[2025-05-12T15:26:31.811+0000] {base.py:73} INFO - Using connection ID '***_default' for task execution.
+[2025-05-12T15:26:31.815+0000] {base.py:73} INFO - Using connection ID '***_default' for task execution.
+[2025-05-12T15:26:31.822+0000] {sql.py:418} INFO - Running statement: 
+            INSERT INTO weekly_signups (week_start, user_signups)
+            SELECT
+                date_trunc('week', CURRENT_DATE)::date AS week_start,
+                COUNT(*)
+            FROM users
+            WHERE created_at >= date_trunc('week', CURRENT_DATE)
+            AND created_at < date_trunc('week', CURRENT_DATE) + INTERVAL '7 days'
+            ON CONFLICT (week_start) DO UPDATE
+            SET user_signups = EXCLUDED.user_signups;
+        , parameters: None
+[2025-05-12T15:26:31.823+0000] {sql.py:427} INFO - Rows affected: 1
+[2025-05-12T15:26:31.834+0000] {taskinstance.py:1400} INFO - Marking task as SUCCESS. dag_id=sample_etl, task_id=aggregate_weekly_signups, execution_date=20250512T152144, start_date=20250512T152631, end_date=20250512T152631
+[2025-05-12T15:26:31.860+0000] {local_task_job_runner.py:228} INFO - Task exited with return code 0
+[2025-05-12T15:26:31.892+0000] {taskinstance.py:2778} INFO - 0 downstream tasks scheduled from follow-on schedule check
