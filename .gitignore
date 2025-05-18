@@ -4,6 +4,7 @@ backend/healthsync.db
 backend/__pycache__
 backend/models/__pycache__
 backend/routes/__pycache__
+backend/test.env
 
 
 backend/models/Misteral
