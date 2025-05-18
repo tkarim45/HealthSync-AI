@@ -1,6 +1,5 @@
 
 frontend/node_modules
-backend/.env
 backend/healthsync.db
 backend/__pycache__
 backend/models/__pycache__
