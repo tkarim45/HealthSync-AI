@@ -11,7 +11,6 @@ backend/models/Misteral
 backend/models/quantized-llama-4b-skin
 backend/notebooks
 
-backend/data
 backend/test.env
 
 backend/utils/.env

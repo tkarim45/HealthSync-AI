@@ -58,14 +58,14 @@ def initialize_rag_system():
         index_names = pc.list_indexes().names()
         if PINECONE_INDEX_NAME not in index_names:
             logger.info(f"Creating Pinecone index '{PINECONE_INDEX_NAME}'...")
-            # pc.create_index(
-            #     name=PINECONE_INDEX_NAME,
-            #     dimension=EMBEDDING_DIMENSION,
-            #     metric="cosine",
-            #     spec=ServerlessSpec(cloud="aws", region="us-east-1"),
-            # )
-            # while not pc.describe_index(PINECONE_INDEX_NAME).status["ready"]:
-            #     time.sleep(5)
+            pc.create_index(
+                name=PINECONE_INDEX_NAME,
+                dimension=EMBEDDING_DIMENSION,
+                metric="cosine",
+                spec=ServerlessSpec(cloud="aws", region="us-east-1"),
+            )
+            while not pc.describe_index(PINECONE_INDEX_NAME).status["ready"]:
+                time.sleep(5)
             logger.info("Index created.")
         else:
             logger.info(f"Using existing index '{PINECONE_INDEX_NAME}'.")
